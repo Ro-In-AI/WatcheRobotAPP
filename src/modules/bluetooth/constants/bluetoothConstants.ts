@@ -48,8 +48,11 @@ export const ACTIONS = [
 
 /** BLE 命令格式 */
 export const COMMANDS = {
-  // 设置舵机
+  // 设置舵机（立即到达）
   SET_SERVO: (servoId: number, angle: number) => `SET_SERVO:${servoId}:${angle}`,
+  // 持续移动（摇杆模式）
+  // direction: 1 = 正向(右转), -1 = 反向(左转), 0 = 停止
+  SERVO_MOVE: (servoId: number, direction: number) => `SERVO_MOVE:${servoId}:${direction}`,
   // 播放动作
   PLAY_ACTION: (actionId: number) => `PLAY_ACTION:${actionId}`,
 };
