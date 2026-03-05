@@ -1,0 +1,23 @@
+/**
+ * Bluetooth 常量定义
+ * @hidden
+ */
+
+export const BLUETOOTH_DEFAULT_CONFIG = {
+  SCAN_TIMEOUT: 10000,
+  CONNECT_TIMEOUT: 10000,
+  RESCAN_DELAY: 3000,
+  MAX_RESCAN_ATTEMPTS: 5,
+  MTU_ANDROID: 512,
+};
+
+/** @hidden */
+export const BLUETOOTH_UUIDS = {
+  // 设备信息服务
+  DEVICE_INFO_SERVICE: '180a',
+  // 特征值
+  MANUFACTURER_NAME: '2a29',
+  FIRMWARE_REVISION: '2a26',
+  HARDWARE_REVISION: '2a27',
+  SERIAL_NUMBER: '2a25',
+};
