@@ -623,10 +623,10 @@ class BluetoothService {
      * @private
      */
     private toBase64(data: Uint8Array | string): string {
+        // react-native-ble-plx 需要 Base64 编码的字符串
         if (typeof data === 'string') {
-            return data;
+            return base64.encode(data);
         }
-
         return base64.encodeFromByteArray(data);
     }
 

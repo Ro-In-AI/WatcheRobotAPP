@@ -528,8 +528,8 @@ export const useBluetooth = (): UseBluetoothReturn => {
         async (options: SendCommandOptions) => {
             const {
                 data,
-                serviceUUID = 'ff010000-1000-8000-0080-5f9b34fb0000',
-                characteristicUUID = 'ef010001-1000-8000-0080-5f9b34fb0000',
+                serviceUUID = '00FF',
+                characteristicUUID = 'FF01',
                 type = 'no_response',
             } = options;
 
