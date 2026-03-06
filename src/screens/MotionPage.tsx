@@ -18,6 +18,7 @@ import { parseBlenderAnimation, generateESP32Commands } from '../utils/animation
 import { BlenderAnimation } from '../types/animation';
 import thinkAnimationJson from '../assets/思考 - 关键_watcher_animation.json';
 import sleepAnimationJson from '../assets/睡觉 - 关键_watcher_animation.json';
+import testAnimationJson from '../assets/测试 - X_watcher_animation.json';
 
 // 动作类型
 interface Motion {
@@ -37,6 +38,7 @@ const MOTIONS: Motion[] = [
 const ANIMATIONS = [
   { id: 'think', name: '思考', json: thinkAnimationJson as BlenderAnimation },
   { id: 'sleep', name: '睡觉', json: sleepAnimationJson as BlenderAnimation },
+  { id: 'test', name: '测试', json: testAnimationJson as BlenderAnimation },
 ];
 
 export const MotionPage: React.FC = () => {
