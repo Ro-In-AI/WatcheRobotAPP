@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,45 +6,149 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
+import { useBluetooth, BluetoothStatus } from '../modules/bluetooth';
+import {
+  ACTIONS,
+  COMMANDS,
+  BLUETOOTH_UUIDS,
+} from '../modules/bluetooth/constants/bluetoothConstants';
+import { parseBlenderAnimation, generateESP32Commands } from '../utils/animationParser';
+import { BlenderAnimation } from '../types/animation';
+import thinkAnimationJson from '../assets/思考 - 关键_watcher_animation.json';
+import sleepAnimationJson from '../assets/睡觉 - 关键_watcher_animation.json';
 
 // 动作类型
 interface Motion {
-  id: string;
+  id: number;
   name: string;
-  description: string;
+  label: string;
   icon: string;
 }
 
-// 可用动作
+// 可用动作 - 基于嵌入式预设动作
 const MOTIONS: Motion[] = [
-  { id: 'forward', name: '前进', description: '向前行走', icon: '⬆️' },
-  { id: 'backward', name: '后退', description: '向后行走', icon: '⬇️' },
-  { id: 'left', name: '左转', description: '向左转体', icon: '⬅️' },
-  { id: 'right', name: '右转', description: '向右转体', icon: '➡️' },
-  { id: 'wave', name: '挥手', description: '抬起手臂挥动', icon: '👋' },
-  { id: 'pushup', name: '俯卧撑', description: '做俯卧撑动作', icon: '💪' },
-  { id: 'sit', name: '坐下', description: '坐下姿势', icon: '🪑' },
-  { id: 'stand', name: '站立', description: '站立姿势', icon: '🧍' },
-  { id: 'dance1', name: '舞蹈1', description: '预设舞蹈动作', icon: '💃' },
-  { id: 'dance2', name: '舞蹈2', description: '预设舞蹈动作', icon: '🕺' },
-  { id: 'bow', name: '鞠躬', description: '礼貌鞠躬', icon: '🙇' },
-  { id: 'shake', name: '握手', description: '握手动作', icon: '🤝' },
+  { id: 0, name: 'wave', label: '挥手', icon: '👋' },
+  { id: 1, name: 'greet', label: '问候', icon: '🙂' },
+];
+
+// 动画文件列表
+const ANIMATIONS = [
+  { id: 'think', name: '思考', json: thinkAnimationJson as BlenderAnimation },
+  { id: 'sleep', name: '睡觉', json: sleepAnimationJson as BlenderAnimation },
 ];
 
 export const MotionPage: React.FC = () => {
-  const [selectedMotion, setSelectedMotion] = useState<string | null>(null);
+  const { status, writeData, deviceInfo, sendCommand } = useBluetooth();
+  const [selectedMotion, setSelectedMotion] = useState<number | null>(null);
+  const [selectedAnimation, setSelectedAnimation] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [speed, setSpeed] = useState(50); // 0-100
 
-  const handleMotionPress = (motionId: string) => {
+  // 检查是否连接
+  const isConnected = status === BluetoothStatus.Connected;
+
+  // 发送命令
+  const sendBLECommand = useCallback(async (command: string) => {
+    try {
+      await sendCommand({
+        data: command,
+        serviceUUID: BLUETOOTH_UUIDS.SERVICE_UUID,
+        characteristicUUID: BLUETOOTH_UUIDS.SERVO_CTRL,
+        type: 'response',
+      });
+      console.log('发送命令:', command);
+    } catch (err: any) {
+      console.error('发送命令失败:', err);
+    }
+  }, [sendCommand]);
+
+  // 发送动作命令 - 使用 sendCommand 更可靠
+  const sendActionCommand = useCallback(async (actionId: number) => {
+    if (!isConnected) {
+      Alert.alert('提示', '请先连接蓝牙设备');
+      return;
+    }
+
+    try {
+      const command = COMMANDS.PLAY_ACTION(actionId);
+      await sendCommand({
+        data: command,
+        serviceUUID: BLUETOOTH_UUIDS.SERVICE_UUID,
+        characteristicUUID: BLUETOOTH_UUIDS.ACTION_CTRL,
+        type: 'response',
+      });
+      console.log('发送动作命令:', command);
+    } catch (err: any) {
+      console.error('发送动作命令失败:', err);
+      Alert.alert('错误', err.message || '发送命令失败，请确保已连接到 ESP_ROBOT 设备');
+    }
+  }, [isConnected, sendCommand]);
+
+  // 播放动画
+  const playAnimation = useCallback(async (animation: typeof ANIMATIONS[0]) => {
+    if (!isConnected) {
+      Alert.alert('提示', '请先连接蓝牙设备');
+      return;
+    }
+
+    try {
+      // 解析动画
+      const parsed = parseBlenderAnimation(animation.json, animation.name);
+      console.log('解析动画:', parsed.name, '时长:', parsed.duration, 'ms');
+      console.log('命令数量:', parsed.servoCommands.length);
+
+      // 生成 ESP32 命令
+      const commands = generateESP32Commands(parsed);
+
+      // 依次发送所有命令
+      for (const cmd of commands) {
+        await sendBLECommand(cmd);
+        // 添加小延迟避免发送过快
+        await new Promise<void>(resolve => {
+          setTimeout(() => resolve(), 10);
+        });
+      }
+
+      console.log('动画命令发送完成');
+      setIsPlaying(true);
+
+      // 动画完成后重置状态
+      setTimeout(() => {
+        setIsPlaying(false);
+        setSelectedAnimation(null);
+      }, parsed.duration);
+    } catch (err: any) {
+      console.error('播放动画失败:', err);
+      Alert.alert('错误', '播放动画失败');
+    }
+  }, [isConnected, sendBLECommand]);
+
+  const handleMotionPress = (motionId: number) => {
     if (selectedMotion === motionId) {
       setSelectedMotion(null);
-      // TODO: 停止动作
+      setIsPlaying(false);
     } else {
       setSelectedMotion(motionId);
-      // TODO: 播放动作
-      console.log('播放动作:', motionId, '速度:', speed);
+      setSelectedAnimation(null);
+      sendActionCommand(motionId);
+      setIsPlaying(true);
+    }
+  };
+
+  const handleAnimationPress = (animationId: string) => {
+    if (selectedAnimation === animationId) {
+      setSelectedAnimation(null);
+      setIsPlaying(false);
+      // 发送停止命令
+      sendBLECommand(COMMANDS.QUEUE_CLEAR());
+    } else {
+      setSelectedAnimation(animationId);
+      setSelectedMotion(null);
+      const animation = ANIMATIONS.find(a => a.id === animationId);
+      if (animation) {
+        playAnimation(animation);
+      }
     }
   };
 
@@ -52,10 +156,20 @@ export const MotionPage: React.FC = () => {
     if (isPlaying) {
       setIsPlaying(false);
       setSelectedMotion(null);
-      // TODO: 停止所有动作
-    } else if (selectedMotion) {
+      setSelectedAnimation(null);
+      // 停止动画队列
+      sendBLECommand(COMMANDS.QUEUE_CLEAR());
+      // 发送初始化角度
+      sendBLECommand(COMMANDS.SET_SERVO(0, 90));
+      sendBLECommand(COMMANDS.SET_SERVO(1, 120));
+    } else if (selectedMotion !== null) {
       setIsPlaying(true);
-      // TODO: 开始循环播放
+      sendActionCommand(selectedMotion);
+    } else if (selectedAnimation !== null) {
+      const animation = ANIMATIONS.find(a => a.id === selectedAnimation);
+      if (animation) {
+        playAnimation(animation);
+      }
     }
   };
 
@@ -63,47 +177,27 @@ export const MotionPage: React.FC = () => {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>动作控制</Text>
-        <View style={styles.statusBadge}>
+        <View style={[styles.statusBadge, { backgroundColor: isConnected ? '#34C759' : '#FF3B30' }]}>
           <Text style={styles.statusText}>
-            {isPlaying ? '运行中' : '空闲'}
+            {isPlaying ? '运行中' : (isConnected ? '就绪' : '未连接')}
           </Text>
         </View>
       </View>
 
       <ScrollView style={styles.content}>
-        {/* 速度控制 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>速度控制</Text>
-          <View style={styles.speedControl}>
-            <Text style={styles.speedLabel}>慢</Text>
-            <View style={styles.speedSlider}>
-              {[25, 50, 75, 100].map((s) => (
-                <TouchableOpacity
-                  key={s}
-                  style={[
-                    styles.speedButton,
-                    speed === s && styles.speedButtonActive,
-                  ]}
-                  onPress={() => setSpeed(s)}
-                >
-                  <Text
-                    style={[
-                      styles.speedButtonText,
-                      speed === s && styles.speedButtonTextActive,
-                    ]}
-                  >
-                    {s}%
-                  </Text>
-                </TouchableOpacity>
-              ))}
+        {/* 连接信息 */}
+        {isConnected && deviceInfo && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>设备信息</Text>
+            <View style={styles.card}>
+              <Text style={styles.deviceName}>{deviceInfo.name || 'ESP_ROBOT'}</Text>
             </View>
-            <Text style={styles.speedLabel}>快</Text>
           </View>
-        </View>
+        )}
 
         {/* 动作网格 */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>动作选择</Text>
+          <Text style={styles.sectionTitle}>预设动作</Text>
           <View style={styles.motionGrid}>
             {MOTIONS.map((motion) => (
               <TouchableOpacity
@@ -111,8 +205,10 @@ export const MotionPage: React.FC = () => {
                 style={[
                   styles.motionCard,
                   selectedMotion === motion.id && styles.motionCardActive,
+                  !isConnected && styles.motionCardDisabled,
                 ]}
                 onPress={() => handleMotionPress(motion.id)}
+                disabled={!isConnected}
               >
                 <Text style={styles.motionIcon}>{motion.icon}</Text>
                 <Text
@@ -121,11 +217,62 @@ export const MotionPage: React.FC = () => {
                     selectedMotion === motion.id && styles.motionNameActive,
                   ]}
                 >
-                  {motion.name}
+                  {motion.label}
                 </Text>
-                <Text style={styles.motionDesc}>{motion.description}</Text>
+                <Text style={styles.motionDesc}>ID: {motion.id}</Text>
               </TouchableOpacity>
             ))}
+          </View>
+        </View>
+
+        {/* Blender 动画 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Blender 动画</Text>
+          <View style={styles.motionGrid}>
+            {ANIMATIONS.map((animation) => (
+              <TouchableOpacity
+                key={animation.id}
+                style={[
+                  styles.motionCard,
+                  selectedAnimation === animation.id && styles.motionCardActive,
+                  !isConnected && styles.motionCardDisabled,
+                ]}
+                onPress={() => handleAnimationPress(animation.id)}
+                disabled={!isConnected}
+              >
+                <Text style={styles.motionIcon}>🎬</Text>
+                <Text
+                  style={[
+                    styles.motionName,
+                    selectedAnimation === animation.id && styles.motionNameActive,
+                  ]}
+                >
+                  {animation.name}
+                </Text>
+                <Text style={styles.motionDesc}>JSON 动画</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* 说明 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>说明</Text>
+          <View style={styles.card}>
+            <Text style={styles.infoText}>
+              预设动作：{'\n'}
+              • ID 0 - 挥手 (wave){'\n'}
+              • ID 1 - 问候 (greet){'\n'}
+              {'\n'}Blender 动画：{'\n'}
+              • 解析 JSON 关键帧数据{'\n'}
+              • 计算时间差并发送队列命令
+            </Text>
+            <Text style={styles.infoText}>
+              {'\n'}命令格式：{'\n'}
+              • PLAY_ACTION:{"<动作ID>"}{'\n'}
+              • QUEUE_ADD:id:angle:duration:delay{'\n'}
+              • QUEUE_START / QUEUE_CLEAR
+            </Text>
           </View>
         </View>
 
@@ -134,13 +281,13 @@ export const MotionPage: React.FC = () => {
           <TouchableOpacity
             style={[
               styles.playButton,
-              !selectedMotion && styles.playButtonDisabled,
+              ((!selectedMotion && !selectedAnimation) || !isConnected) && styles.playButtonDisabled,
             ]}
             onPress={handlePlayStop}
-            disabled={!selectedMotion}
+            disabled={(!selectedMotion && !selectedAnimation) || !isConnected}
           >
             <Text style={styles.playButtonText}>
-              {isPlaying ? '停止' : '播放动作'}
+              {isPlaying ? '停止' : '播放'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -168,7 +315,6 @@ const styles = StyleSheet.create({
     color: '#000',
   },
   statusBadge: {
-    backgroundColor: '#34C759',
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
@@ -192,39 +338,20 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     marginLeft: 4,
   },
-  speedControl: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  card: {
     backgroundColor: '#FFF',
     borderRadius: 12,
     padding: 16,
   },
-  speedLabel: {
-    fontSize: 12,
-    color: '#8E8E93',
-  },
-  speedSlider: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginHorizontal: 12,
-  },
-  speedButton: {
-    backgroundColor: '#F2F2F7',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  speedButtonActive: {
-    backgroundColor: '#007AFF',
-  },
-  speedButtonText: {
-    fontSize: 14,
-    color: '#007AFF',
+  deviceName: {
+    fontSize: 16,
+    color: '#000',
     fontWeight: '500',
   },
-  speedButtonTextActive: {
-    color: '#FFF',
+  infoText: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 22,
   },
   motionGrid: {
     flexDirection: 'row',
@@ -235,18 +362,21 @@ const styles = StyleSheet.create({
     width: '47%',
     backgroundColor: '#FFF',
     borderRadius: 12,
-    padding: 16,
+    padding: 20,
     alignItems: 'center',
   },
   motionCardActive: {
     backgroundColor: '#007AFF',
   },
+  motionCardDisabled: {
+    opacity: 0.5,
+  },
   motionIcon: {
-    fontSize: 32,
-    marginBottom: 8,
+    fontSize: 40,
+    marginBottom: 12,
   },
   motionName: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     color: '#000',
     marginBottom: 4,
@@ -255,9 +385,8 @@ const styles = StyleSheet.create({
     color: '#FFF',
   },
   motionDesc: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#8E8E93',
-    textAlign: 'center',
   },
   playButton: {
     backgroundColor: '#34C759',

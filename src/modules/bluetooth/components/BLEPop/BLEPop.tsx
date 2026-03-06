@@ -358,7 +358,7 @@ export const BLEPop: React.FC<BLEPopProps> = ({
                     {/* 顶部封面 */}
                     <View style={styles.coverContainer}>
                         <Image
-                            source={require('@/assets/scene1.jpg')}
+                            // source={require('@/assets/scene1.jpg')}
                             style={styles.deviceImage as ImageStyle}
                         />
                         {/* 黑色遮罩 */}

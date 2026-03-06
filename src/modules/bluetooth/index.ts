@@ -15,6 +15,7 @@
 export * from './components/BLEPop';
 export * from './screens/BluetoothScreen';
 export * from './services/bluetoothService';
+export * from './services/bleCommandHelper';
 export * from './hooks/useBluetooth';
 /** @hidden */
 export * from './store';

@@ -55,4 +55,11 @@ export const COMMANDS = {
   SERVO_MOVE: (servoId: number, direction: number) => `SERVO_MOVE:${servoId}:${direction}`,
   // 播放动作
   PLAY_ACTION: (actionId: number) => `PLAY_ACTION:${actionId}`,
+  // 队列命令：将命令添加到队列（按顺序执行）
+  // servoId: 舵机ID, angle: 目标角度, duration: 移动持续时间(ms)
+  // ESP32 队列会自动按顺序执行，每条命令执行 duration 时间后执行下一条
+  QUEUE_ADD: (servoId: number, angle: number, duration: number) =>
+    `QUEUE_ADD:${servoId}:${angle}:${duration}`,
+  // 队列命令：清空队列
+  QUEUE_CLEAR: () => 'QUEUE_CLEAR',
 };
