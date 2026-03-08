@@ -3,6 +3,9 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
+    "set-icon": "react-native set-icon --path ./icon.png",
+    "set-icon:android": "react-native set-icon --platform android --path ./icon.png",
+    "set-icon:ios": "react-native set-icon --platform ios --path ./icon.png",
     "android": "react-native run-android",
     "ios": "react-native run-ios",
     "lint": "eslint .",

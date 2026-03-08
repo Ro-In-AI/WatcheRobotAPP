@@ -19,6 +19,11 @@ import { BlenderAnimation } from '../types/animation';
 import thinkAnimationJson from '../assets/思考 - 关键_watcher_animation.json';
 import sleepAnimationJson from '../assets/睡觉 - 关键_watcher_animation.json';
 import testAnimationJson from '../assets/测试 - X_watcher_animation.json';
+import executeAnimationJson from '../assets/Execute30fps8s.json';
+import failAnimationJson from '../assets/fail30fps4s.json';
+import speakAnimationJson from '../assets/speak30fps7s-2.json';
+import successAnimationJson from '../assets/Success30fps3s.json';
+import thinkingAnimationJson from '../assets/thinking30fps6s.json';
 
 // 动作类型
 interface Motion {
@@ -39,6 +44,11 @@ const ANIMATIONS = [
   { id: 'think', name: '思考', json: thinkAnimationJson as BlenderAnimation },
   { id: 'sleep', name: '睡觉', json: sleepAnimationJson as BlenderAnimation },
   { id: 'test', name: '测试', json: testAnimationJson as BlenderAnimation },
+  { id: 'execute', name: '执行', json: executeAnimationJson as BlenderAnimation },
+  { id: 'fail', name: '失败', json: failAnimationJson as BlenderAnimation },
+  { id: 'speak', name: '说话', json: speakAnimationJson as BlenderAnimation },
+  { id: 'success', name: '成功', json: successAnimationJson as BlenderAnimation },
+  { id: 'thinking', name: '思考2', json: thinkingAnimationJson as BlenderAnimation },
 ];
 
 export const MotionPage: React.FC = () => {
