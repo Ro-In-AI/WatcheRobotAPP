@@ -1,7 +1,27 @@
 {
-  "name": "WatcherRobotAPP",
-  "version": "0.0.1",
-  "private": true,
+  "name": "watcher-robot-app",
+  "version": "1.0.0",
+  "description": "A React Native application for controlling dual-axis robot (Watcher Robot) via Bluetooth Low Energy (BLE)",
+  "private": false,
+  "license": "GPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/watcher-robot/watcher-robot-app.git"
+  },
+  "homepage": "https://github.com/watcher-robot/watcher-robot-app#readme",
+  "keywords": [
+    "react-native",
+    "ble",
+    "bluetooth",
+    "robot",
+    "esp32",
+    "servo",
+    "watcher"
+  ],
+  "author": {
+    "name": "Watcher Robot Team",
+    "email": "contact@watcher-robot.com"
+  },
   "scripts": {
     "set-icon": "react-native set-icon --path ./icon.png",
     "set-icon:android": "react-native set-icon --platform android --path ./icon.png",
