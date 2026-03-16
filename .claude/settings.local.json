@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npm install:*)"
+    ],
+    "additionalDirectories": [
+      "d:\\WatcheRobotAPP\\src\\assets\\icons"
     ]
   }
 }
