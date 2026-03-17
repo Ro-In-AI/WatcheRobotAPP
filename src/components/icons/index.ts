@@ -1,1 +1,1 @@
-export { DanceIcon, MotionIcon, SurveillanceIcon, ExpressionIcon } from './HomeCardIcons';
+export { DanceIcon, MotionIcon, SurveillanceIcon, AnimationIcon } from './HomeCardIcons';

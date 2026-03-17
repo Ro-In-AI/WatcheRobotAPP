@@ -1,15 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Pressable,
   Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Icon from 'react-native-vector-icons/Feather';
-import { DanceIcon, MotionIcon, SurveillanceIcon } from '../components/icons';
+import { Svg, Path } from 'react-native-svg';
+import { DanceIcon, MotionIcon, SurveillanceIcon, AnimationIcon } from '../components/icons';
 
 // 设计稿颜色提取
 const COLORS = {
@@ -30,6 +31,22 @@ const COLORS = {
  */
 export const WatcherPage: React.FC = () => {
   const insets = useSafeAreaInsets();
+  const [activeModes, setActiveModes] = useState<string[]>([]);
+
+  const cards = [
+    { id: 'DANCE', title: 'DANCE', icon: DanceIcon },
+    { id: 'MOTION', title: 'MOTION', icon: MotionIcon },
+    { id: 'SURVEILLANCE', title: 'SURVEILLANCE', icon: SurveillanceIcon },
+    { id: 'ANIMATION', title: 'ANIMATION', icon: AnimationIcon },
+  ];
+
+  const toggleCard = (cardId: string) => {
+    setActiveModes(prev =>
+      prev.includes(cardId)
+        ? prev.filter(id => id !== cardId)
+        : [...prev, cardId]
+    );
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 10 }]}>
@@ -42,13 +59,20 @@ export const WatcherPage: React.FC = () => {
         <View style={styles.header}>
           {/* 左侧：Watcher 标题 + 三角形图标 */}
           <View style={styles.headerLeft}>
-            <Text style={styles.headerTitle}>Watcher</Text>
+            <Text style={styles.headerTitle}>
+              Wat<Text style={{ color: '#8FC31F' }}>c</Text>her
+            </Text>
             <View style={styles.triangleIcon} />
           </View>
 
           {/* 右侧：通知铃铛图标 */}
           <TouchableOpacity style={styles.bellButton}>
-            <Icon name="bell" size={18} color={COLORS.black} />
+            <Svg width={18} height={18} viewBox="0 0 14 16" fill="none">
+              <Path
+                d="M6.07725 14.0625L6.075 14.0873C6.07503 14.2473 6.13195 14.4022 6.23561 14.5242C6.33926 14.6462 6.4829 14.7274 6.64087 14.7533L6.75 14.7622C6.84076 14.7623 6.93061 14.7441 7.01416 14.7086C7.09771 14.6731 7.17325 14.6212 7.23627 14.5559C7.29928 14.4906 7.34847 14.4132 7.3809 14.3284C7.41333 14.2436 7.42833 14.1532 7.425 14.0625H8.4375C8.43729 14.4959 8.27035 14.9125 7.97129 15.2262C7.67223 15.5398 7.26396 15.7264 6.8311 15.7472C6.39823 15.768 5.97394 15.6215 5.64615 15.3381C5.31836 15.0546 5.11219 14.6558 5.07037 14.2245L5.0625 14.0625H6.07725ZM7.335 0V1.15538C8.71804 1.3 9.99849 1.95178 10.9292 2.98495C11.86 4.01812 12.375 5.35942 12.375 6.75V12.3739L13.5 12.375V13.5L12.375 13.4989V13.5H1.125V13.4989L0 13.5V12.375L1.125 12.3739V6.75C1.1249 5.35606 1.64238 4.01173 2.57711 2.97763C3.51185 1.94354 4.79725 1.29336 6.18413 1.15313L6.18525 0H7.335ZM6.75 2.25C5.55653 2.25 4.41193 2.72411 3.56802 3.56802C2.72411 4.41193 2.25 5.55653 2.25 6.75V12.3739H11.25V6.75C11.25 5.55653 10.7759 4.41193 9.93198 3.56802C9.08807 2.72411 7.94347 2.25 6.75 2.25Z"
+                fill={COLORS.black}
+              />
+            </Svg>
           </TouchableOpacity>
         </View>
 
@@ -69,35 +93,36 @@ export const WatcherPage: React.FC = () => {
         </View>
 
         {/* ===== 核心按钮：Connect the device ===== */}
-        <TouchableOpacity style={styles.connectButton}>
-          <Text style={styles.connectButtonText}>Connect the device</Text>
-        </TouchableOpacity>
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity style={styles.connectButton}>
+            <Text style={styles.connectButtonText}>Connect the device</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* ===== 功能卡片网格 (Grid Cards) ===== */}
         <View style={styles.gridContainer}>
-          {/* DANCE 卡片 - 48% 宽度 */}
-          <TouchableOpacity style={styles.gridCard}>
-            <Text style={styles.cardTitle}>DANCE</Text>
-            <View style={styles.cardIconBg}>
-              <DanceIcon size={20} />
-            </View>
-          </TouchableOpacity>
-
-          {/* MOTION 卡片 - 48% 宽度 */}
-          <TouchableOpacity style={styles.gridCard}>
-            <Text style={styles.cardTitle}>MOTION</Text>
-            <View style={styles.cardIconBg}>
-              <MotionIcon size={20} />
-            </View>
-          </TouchableOpacity>
-
-          {/* SURVEILLANCE 卡片 - 100% 宽度，marginTop 撑开间距 */}
-          <TouchableOpacity style={styles.fullWidthCard}>
-            <Text style={styles.cardTitle}>SURVEILLANCE</Text>
-            <View style={styles.cardIconBg}>
-              <SurveillanceIcon size={20} />
-            </View>
-          </TouchableOpacity>
+          {cards.map((card) => {
+            const isActive = activeModes.includes(card.id);
+            const IconComponent = card.icon;
+            return (
+              <Pressable
+                key={card.id}
+                style={({ pressed }) => [
+                  styles.gridCard,
+                  pressed && styles.gridCardPressed,
+                ]}
+                onPress={() => toggleCard(card.id)}
+              >
+                <Text style={styles.cardTitle}>{card.title}</Text>
+                <View style={styles.cardIconBg}>
+                  <IconComponent
+                    size={26}
+                    color={isActive ? COLORS.green : COLORS.cardTitle}
+                  />
+                </View>
+              </Pressable>
+            );
+          })}
         </View>
       </ScrollView>
     </View>
@@ -118,7 +143,7 @@ const styles = StyleSheet.create({
 
   // 【关键】防止底部内容被悬浮导航栏遮挡
   scrollContent: {
-    paddingBottom: 120, // 底部导航栏高度 + 安全距离
+    paddingBottom: 120,
     paddingHorizontal: 20,
   },
 
@@ -177,11 +202,11 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 
-  // 机器人图片 - 真实产品图，contain 模式保持比例
-  // 设计稿：width: 250, height: 250
+  // 机器人图片 - 按照 Node ID: uLuHB 设计稿
+  // height: 196, width: fill_container
   deviceImage: {
-    width: 250,
-    height: 250,
+    width: '100%',
+    height: 196,
     alignSelf: 'center',
   },
 
@@ -211,91 +236,77 @@ const styles = StyleSheet.create({
     color: COLORS.statusGray,
   },
 
-  // ===== Connect 按钮 =====
-  // 设计稿：backgroundColor: #8fc31f, cornerRadius: 30, padding: [18, 38]
-  connectButton: {
-    width: '100%',
-    backgroundColor: COLORS.green,
-    borderRadius: 30,
-    paddingVertical: 18,
-    paddingHorizontal: 38,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 40,
+  // ===== Connect 按钮容器 =====
+  buttonContainer: {
+    marginHorizontal: -10,  // 向外扩展 10px
+    paddingHorizontal: 20,  // 实际边距 = 20(父) - 10(扩展) + 20(自己) = 30px
+    marginBottom: 30,
   },
 
-  // 按钮文字
-  // 设计稿：fontFamily: Inter, fontSize: 16, fontWeight: 500, color: #ffffff
+  // ===== Connect 按钮 =====
+  connectButton: {
+    display: 'flex',
+    width: '100%',  // 自适应屏幕宽度
+    paddingVertical: 18,
+    paddingHorizontal: 38,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 30,
+    backgroundColor: '#8FC31F',
+  },
+
+  // 按钮文字 - 按照设计稿 Node ID: kBpN3
   connectButtonText: {
     fontFamily: 'Inter',
     fontSize: 16,
     fontWeight: '500',
-    color: COLORS.white,
-    letterSpacing: 0.2,
+    color: '#FFFFFF',
+    lineHeight: 16,
+    textAlign: 'center',
   },
 
   // ===== 功能卡片网格 =====
-  // 关键：flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between'
+  // 按照设计稿：rowGap: 12
   gridContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    rowGap: 12,
   },
 
-  // 网格卡片 - DANCE 和 MOTION
-  // 设计稿：width: 48%, height: ~120
+  // 网格卡片
   gridCard: {
-    width: '48%',
-    height: 120,
+    width: '47%',
+    height: 116,
     backgroundColor: COLORS.white,
     borderRadius: 12,
-    padding: 15,
-    justifyContent: 'space-between', // 关键：文字在上，图标在下
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    padding: 16,
   },
 
-  // 全宽卡片 - SURVEILLANCE
-  // 设计稿：width: 100%, marginTop: 15 撑开间距
-  fullWidthCard: {
-    width: '100%',
-    height: 80,
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: 15,
-    marginTop: 15, // 撑开与上方卡片的间距
-    justifyContent: 'space-between',
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+  // 按下状态卡片（交互反馈）
+  gridCardPressed: {
+    opacity: 0.9,
   },
 
-  // 卡片图标底座
-  // 设计稿：width: 40, height: 40, borderRadius: 20, backgroundColor: '#F0F0F0'
+  // 卡片图标底座 - 按照设计稿规格
   cardIconBg: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.iconBg,
+    position: 'absolute',
+    bottom: 16,
+    left: 16,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#F3F5F8',
     justifyContent: 'center',
     alignItems: 'center',
-    alignSelf: 'flex-end', // 图标在卡片底部
   },
 
-  // 卡片标题
-  // 设计稿：fontFamily: Inter, fontSize: 16, fontWeight: 700, color: #636a74
+  // 卡片标题 - 按照设计稿规格
   cardTitle: {
     fontFamily: 'Inter',
     fontSize: 16,
     fontWeight: '700',
-    color: COLORS.cardTitle,
-    letterSpacing: 0.2,
+    color: '#636A74',
+    lineHeight: 16,
   },
 });
