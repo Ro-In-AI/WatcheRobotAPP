@@ -31,7 +31,7 @@ const COLORS = {
  */
 export const WatcherPage: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const [activeModes, setActiveModes] = useState<string[]>([]);
+  const [isConnected, setIsConnected] = useState(false);
 
   const cards = [
     { id: 'DANCE', title: 'DANCE', icon: DanceIcon },
@@ -39,14 +39,6 @@ export const WatcherPage: React.FC = () => {
     { id: 'SURVEILLANCE', title: 'SURVEILLANCE', icon: SurveillanceIcon },
     { id: 'ANIMATION', title: 'ANIMATION', icon: AnimationIcon },
   ];
-
-  const toggleCard = (cardId: string) => {
-    setActiveModes(prev =>
-      prev.includes(cardId)
-        ? prev.filter(id => id !== cardId)
-        : [...prev, cardId]
-    );
-  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 10 }]}>
@@ -85,42 +77,40 @@ export const WatcherPage: React.FC = () => {
             resizeMode="contain"
           />
 
-          {/* 状态行：红点 + Device Offline */}
+          {/* 状态行：根据连接状态显示 */}
           <View style={styles.statusRow}>
-            <View style={styles.statusDot} />
-            <Text style={styles.statusText}>Device Offline</Text>
+            <View style={[styles.statusDot, { backgroundColor: isConnected ? '#8FC31F' : '#D20706' }]} />
+            <Text style={styles.statusText}>{isConnected ? 'Online' : 'Device Offline'}</Text>
           </View>
         </View>
 
-        {/* ===== 核心按钮：Connect the device ===== */}
+        {/* ===== 核心按钮：根据连接状态显示不同按钮 ===== */}
         <View style={styles.buttonContainer}>
-          <TouchableOpacity style={styles.connectButton}>
-            <Text style={styles.connectButtonText}>Connect the device</Text>
+          <TouchableOpacity
+            style={[styles.connectButton, isConnected && styles.connectButtonDisabled]}
+            onPress={() => setIsConnected(!isConnected)}
+          >
+            <Text style={styles.connectButtonText}>
+              {isConnected ? 'Disconnect' : 'Connect the device'}
+            </Text>
           </TouchableOpacity>
         </View>
 
         {/* ===== 功能卡片网格 (Grid Cards) ===== */}
+        {/* ===== 功能卡片网格 (Grid Cards) ===== */}
         <View style={styles.gridContainer}>
           {cards.map((card) => {
-            const isActive = activeModes.includes(card.id);
             const IconComponent = card.icon;
             return (
-              <Pressable
-                key={card.id}
-                style={({ pressed }) => [
-                  styles.gridCard,
-                  pressed && styles.gridCardPressed,
-                ]}
-                onPress={() => toggleCard(card.id)}
-              >
+              <View key={card.id} style={styles.gridCard}>
                 <Text style={styles.cardTitle}>{card.title}</Text>
                 <View style={styles.cardIconBg}>
                   <IconComponent
                     size={26}
-                    color={isActive ? COLORS.green : COLORS.cardTitle}
+                    color={isConnected ? COLORS.green : COLORS.cardTitle}
                   />
                 </View>
-              </Pressable>
+              </View>
             );
           })}
         </View>
@@ -218,13 +208,11 @@ const styles = StyleSheet.create({
     gap: 8,
   },
 
-  // 状态红点
-  // 设计稿：#d20706, 6x6 ellipse
+  // 状态圆点 - 颜色根据连接状态动态设置
   statusDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: COLORS.statusRed,
   },
 
   // 状态文字
@@ -253,6 +241,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 30,
     backgroundColor: '#8FC31F',
+  },
+
+  // 已连接状态的按钮样式 - 按照设计稿 Node ID: yy2kD
+  connectButtonDisabled: {
+    backgroundColor: '#E1E1E7',
   },
 
   // 按钮文字 - 按照设计稿 Node ID: kBpN3
