@@ -111,9 +111,13 @@ export const WatcherPage: React.FC = () => {
                 key={card.id}
                 style={styles.gridCard}
                 onPress={() => {
-                  if (card.id === 'DANCE') {
-                    navigation.navigate('Dance');
-                  }
+                  // 根据 card.id 导航到对应页面
+                  const routeName: keyof WatcherStackParamList =
+                    card.id === 'DANCE' ? 'Dance' :
+                    card.id === 'MOTION' ? 'Motion' :
+                    card.id === 'SURVEILLANCE' ? 'Surveillance' :
+                    'Animation';
+                  navigation.navigate(routeName);
                 }}
               >
                 <Text style={styles.cardTitle}>{card.title}</Text>

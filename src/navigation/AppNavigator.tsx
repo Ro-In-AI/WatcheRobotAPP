@@ -16,13 +16,19 @@ import {
   NearbyPage,
   MomentsPage,
   UserPage,
+  MotionPage,
+  DancePage,
+  SurveillancePage,
+  AnimationPage,
 } from '../screens';
-import { DancePage } from '../screens/DancePage';
 
 // Stack Navigator 参数类型
 export type WatcherStackParamList = {
   WatcherHome: undefined;
   Dance: undefined;
+  Motion: undefined;
+  Surveillance: undefined;
+  Animation: undefined;
 };
 
 // 导航参数类型
@@ -159,6 +165,9 @@ const WatcherStack: React.FC = () => {
     >
       <Stack.Screen name="WatcherHome" component={WatcherPage} />
       <Stack.Screen name="Dance" component={DancePage} />
+      <Stack.Screen name="Motion" component={MotionPage} />
+      <Stack.Screen name="Surveillance" component={SurveillancePage} />
+      <Stack.Screen name="Animation" component={AnimationPage} />
     </Stack.Navigator>
   );
 };
