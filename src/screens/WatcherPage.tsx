@@ -5,12 +5,17 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Pressable,
   Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Svg, Path } from 'react-native-svg';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { DanceIcon, MotionIcon, SurveillanceIcon, AnimationIcon } from '../components/icons';
+
+import type { WatcherStackParamList } from '../navigation/AppNavigator';
+
+type NavigationProp = NativeStackNavigationProp<WatcherStackParamList>;
 
 // 设计稿颜色提取
 const COLORS = {
@@ -31,6 +36,7 @@ const COLORS = {
  */
 export const WatcherPage: React.FC = () => {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<NavigationProp>();
   const [isConnected, setIsConnected] = useState(false);
 
   const cards = [
@@ -97,12 +103,19 @@ export const WatcherPage: React.FC = () => {
         </View>
 
         {/* ===== 功能卡片网格 (Grid Cards) ===== */}
-        {/* ===== 功能卡片网格 (Grid Cards) ===== */}
         <View style={styles.gridContainer}>
           {cards.map((card) => {
             const IconComponent = card.icon;
             return (
-              <View key={card.id} style={styles.gridCard}>
+              <TouchableOpacity
+                key={card.id}
+                style={styles.gridCard}
+                onPress={() => {
+                  if (card.id === 'DANCE') {
+                    navigation.navigate('Dance');
+                  }
+                }}
+              >
                 <Text style={styles.cardTitle}>{card.title}</Text>
                 <View style={styles.cardIconBg}>
                   <IconComponent
@@ -110,7 +123,7 @@ export const WatcherPage: React.FC = () => {
                     color={isConnected ? COLORS.green : COLORS.cardTitle}
                   />
                 </View>
-              </View>
+              </TouchableOpacity>
             );
           })}
         </View>
