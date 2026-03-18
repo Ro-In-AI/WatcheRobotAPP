@@ -9,13 +9,13 @@ import {
   Alert,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
-import { useBluetooth, BluetoothStatus } from '../modules/bluetooth';
+import { useBluetooth, BluetoothStatus } from '../../modules/bluetooth';
 import {
   SERVO_CONFIG,
   ACTIONS,
   COMMANDS,
   BLUETOOTH_UUIDS,
-} from '../modules/bluetooth/constants/bluetoothConstants';
+} from '../../modules/bluetooth/constants/bluetoothConstants';
 
 // 平滑参数
 const SMOOTH_ALPHA = 0.3; // 指数平滑系数：越大响应越快，越小越平滑
@@ -35,7 +35,7 @@ const PRESETS = [
   { name: '抬头', angles: [90, 95] },
 ];
 
-export const ControlPage: React.FC = () => {
+export const OldControlPage: React.FC = () => {
   const { status, writeData, deviceInfo, error, sendCommand } = useBluetooth();
   const [angles, setAngles] = useState<number[]>([90, 120]);
   const [isSending, setIsSending] = useState(false);

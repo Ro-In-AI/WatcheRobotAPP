@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import {
   View,
   Text,
@@ -15,7 +16,20 @@ import {
   NearbyPage,
   MomentsPage,
   UserPage,
+  MotionPage,
+  DancePage,
+  SurveillancePage,
+  AnimationPage,
 } from '../screens';
+
+// Stack Navigator 参数类型
+export type WatcherStackParamList = {
+  WatcherHome: undefined;
+  Dance: undefined;
+  Motion: undefined;
+  Surveillance: undefined;
+  Animation: undefined;
+};
 
 // 导航参数类型
 export type RootTabParamList = {
@@ -24,6 +38,8 @@ export type RootTabParamList = {
   Moments: undefined;
   User: undefined;
 };
+
+const Stack = createNativeStackNavigator<WatcherStackParamList>();
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
 
@@ -48,9 +64,33 @@ const TAB_CONFIG = [
  * 完全还原设计稿样式：悬浮式胶囊导航栏
  * 使用 react-native-shadow-2 实现跨平台柔和阴影
  * 使用 SVG 图标组件，支持动态颜色
+ * 当在深层页面时自动隐藏
  */
 const CustomTabBar: React.FC<any> = (props) => {
   const { state, navigation } = props;
+
+  // 检查是否应该隐藏 Tab Bar
+  const shouldHideTabBar = () => {
+    try {
+      // 获取当前选中的 Tab
+      const currentTab = state.routes[state.index];
+
+      // 只处理 Watcher Tab
+      if (currentTab.name === 'Watcher' && currentTab.state) {
+        // Watcher Tab 有一个嵌套的 Stack Navigator
+        // 检查 Stack 的当前索引，大于 0 表示在深层页面
+        const stackIndex = currentTab.state.index;
+        return stackIndex > 0;
+      }
+    } catch (e) {
+      console.log('TabBar check error:', e);
+    }
+    return false;
+  };
+
+  if (shouldHideTabBar()) {
+    return null;
+  }
 
   return (
     <View style={styles.floatingContainer}>
@@ -115,6 +155,23 @@ const CustomTabBar: React.FC<any> = (props) => {
   );
 };
 
+// Watcher Stack Navigator - 支持页面跳转
+const WatcherStack: React.FC = () => {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+      }}
+    >
+      <Stack.Screen name="WatcherHome" component={WatcherPage} />
+      <Stack.Screen name="Dance" component={DancePage} />
+      <Stack.Screen name="Motion" component={MotionPage} />
+      <Stack.Screen name="Surveillance" component={SurveillancePage} />
+      <Stack.Screen name="Animation" component={AnimationPage} />
+    </Stack.Navigator>
+  );
+};
+
 export const AppNavigator: React.FC = () => {
   return (
     <NavigationContainer>
@@ -124,7 +181,7 @@ export const AppNavigator: React.FC = () => {
           headerShown: false,
         }}
       >
-        <Tab.Screen name="Watcher" component={WatcherPage} />
+        <Tab.Screen name="Watcher" component={WatcherStack} />
         <Tab.Screen name="Nearby" component={NearbyPage} />
         <Tab.Screen name="Moments" component={MomentsPage} />
         <Tab.Screen name="User" component={UserPage} />

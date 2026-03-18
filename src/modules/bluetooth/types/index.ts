@@ -144,6 +144,28 @@ export interface SendCommandOptions {
     type?: 'response' | 'no_response';
 }
 
+export interface WifiProvisioningPayload {
+    ssid: string;
+    password: string;
+}
+
+export type WifiProvisioningState =
+    | 'idle'
+    | 'unconfigured'
+    | 'connecting'
+    | 'connected'
+    | 'disconnected'
+    | 'cleared'
+    | 'error';
+
+export interface WifiProvisioningStatus {
+    state: WifiProvisioningState;
+    message: string;
+    raw: string;
+    ssid?: string;
+    ip?: string;
+}
+
 /**
  * 蓝牙接收数据接口
  *
@@ -278,6 +300,28 @@ export interface UseBluetoothReturn {
      * @param options 发送命令选项
      */
     sendCommand: (options: SendCommandOptions) => Promise<void>;
+
+    /**
+     * 璁㈤槄 Wi-Fi 閰嶇綉鐘舵€侀€氱煡
+     */
+    subscribeToProvisioningStatus: (
+        callback: (status: WifiProvisioningStatus) => void,
+    ) => () => void;
+
+    /**
+     * 璇锋眰褰撳墠 Wi-Fi 鐘舵€?
+     */
+    requestWifiStatus: () => Promise<void>;
+
+    /**
+     * 涓嬪彂 Wi-Fi SSID 鍜屽瘑鐮?
+     */
+    configureWifi: (payload: WifiProvisioningPayload) => Promise<void>;
+
+    /**
+     * 娓呴櫎宸蹭繚瀛樼殑 Wi-Fi 鍑嵁
+     */
+    clearWifiCredentials: () => Promise<void>;
 
     /**
      * 清除错误状态
