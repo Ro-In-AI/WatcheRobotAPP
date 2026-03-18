@@ -78,7 +78,7 @@ export const AnimationPage: React.FC = () => {
 
         <View style={styles.contentCard}>
           <Image
-            source={require('../assets/images/robot_watcher.png')}
+            source={require('../../assets/images/robot_watcher.png')}
             style={styles.cardImage}
             resizeMode="contain"
           />

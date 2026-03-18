@@ -9,13 +9,13 @@ import {
   Alert,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
-import { useBluetooth, BluetoothStatus } from '../modules/bluetooth';
+import { useBluetooth, BluetoothStatus } from '../../modules/bluetooth';
 import {
   SERVO_CONFIG,
   ACTIONS,
   COMMANDS,
   BLUETOOTH_UUIDS,
-} from '../modules/bluetooth/constants/bluetoothConstants';
+} from '../../modules/bluetooth/constants/bluetoothConstants';
 
 // 平滑参数
 const SMOOTH_ALPHA = 0.3; // 指数平滑系数：越大响应越快，越小越平滑

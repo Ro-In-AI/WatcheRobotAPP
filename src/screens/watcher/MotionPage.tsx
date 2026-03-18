@@ -8,22 +8,22 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
-import { useBluetooth, BluetoothStatus } from '../modules/bluetooth';
+import { useBluetooth, BluetoothStatus } from '../../modules/bluetooth';
 import {
   ACTIONS,
   COMMANDS,
   BLUETOOTH_UUIDS,
-} from '../modules/bluetooth/constants/bluetoothConstants';
-import { parseBlenderAnimation, generateESP32Commands } from '../utils/animationParser';
-import { BlenderAnimation } from '../types/animation';
-import thinkAnimationJson from '../assets/思考 - 关键_watcher_animation.json';
-import sleepAnimationJson from '../assets/睡觉 - 关键_watcher_animation.json';
-import testAnimationJson from '../assets/测试 - X_watcher_animation.json';
-import executeAnimationJson from '../assets/Execute30fps8s.json';
-import failAnimationJson from '../assets/fail30fps4s.json';
-import speakAnimationJson from '../assets/speak30fps7s-2.json';
-import successAnimationJson from '../assets/Success30fps3s.json';
-import thinkingAnimationJson from '../assets/thinking30fps6s.json';
+} from '../../modules/bluetooth/constants/bluetoothConstants';
+import { parseBlenderAnimation, generateESP32Commands } from '../../utils/animationParser';
+import { BlenderAnimation } from '../../types/animation';
+import thinkAnimationJson from '../../assets/思考 - 关键_watcher_animation.json';
+import sleepAnimationJson from '../../assets/睡觉 - 关键_watcher_animation.json';
+import testAnimationJson from '../../assets/测试 - X_watcher_animation.json';
+import executeAnimationJson from '../../assets/Execute30fps8s.json';
+import failAnimationJson from '../../assets/fail30fps4s.json';
+import speakAnimationJson from '../../assets/speak30fps7s-2.json';
+import successAnimationJson from '../../assets/Success30fps3s.json';
+import thinkingAnimationJson from '../../assets/thinking30fps6s.json';
 
 // 动作类型
 interface Motion {

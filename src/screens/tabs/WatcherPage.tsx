@@ -11,9 +11,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Svg, Path } from 'react-native-svg';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { DanceIcon, MotionIcon, SurveillanceIcon, AnimationIcon } from '../components/icons';
+import { DanceIcon, MotionIcon, SurveillanceIcon, AnimationIcon } from '../../components/icons';
 
-import type { WatcherStackParamList } from '../navigation/AppNavigator';
+import type { WatcherStackParamList } from '../../navigation/AppNavigator';
 
 type NavigationProp = NativeStackNavigationProp<WatcherStackParamList>;
 
@@ -78,7 +78,7 @@ export const WatcherPage: React.FC = () => {
         <View style={styles.deviceSection}>
           {/* 机器人图片 - 使用真实产品图 */}
           <Image
-            source={require('../assets/images/robot_watcher.png')}
+            source={require('../../assets/images/robot_watcher.png')}
             style={styles.deviceImage}
             resizeMode="contain"
           />
