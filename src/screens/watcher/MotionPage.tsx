@@ -1,17 +1,18 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   Alert,
-  ScrollView,
   Image,
+  PanResponder,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import Svg, { Path, Ellipse, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { useBluetooth, BluetoothStatus } from '../../modules/bluetooth';
 import {
-  ACTIONS,
   COMMANDS,
   BLUETOOTH_UUIDS,
 } from '../../modules/bluetooth/constants/bluetoothConstants';
@@ -20,58 +21,51 @@ import { BlenderAnimation } from '../../types/animation';
 import thinkAnimationJson from '../../assets/思考 - 关键_watcher_animation.json';
 import sleepAnimationJson from '../../assets/睡觉 - 关键_watcher_animation.json';
 import testAnimationJson from '../../assets/测试 - X_watcher_animation.json';
-import executeAnimationJson from '../../assets/Execute30fps8s.json';
-import failAnimationJson from '../../assets/fail30fps4s.json';
-import speakAnimationJson from '../../assets/speak30fps7s-2.json';
-import successAnimationJson from '../../assets/Success30fps3s.json';
-import thinkingAnimationJson from '../../assets/thinking30fps6s.json';
 
 // 颜色常量
 const COLORS = {
-  lightGray: '#E1E1E7',
+  background: '#F5F5F9',
   white: '#FFFFFF',
-  black: '#000000',
+  gray: '#8E959F',
+  lightGray: '#F3F5F8',
   green: '#8FC31F',
-  greenStroke: '#8FC31F',
-  textDark: '#0D0D0D',
-  textGray: '#636A74',
-  bgGray: '#F3F5F8',
+  greenDark: '#77C320',
+  black: '#000000',
+  separator: 'rgba(0, 0, 0, 0.05)',
 };
 
-// 预设动作
-interface Motion {
-  id: number;
-  name: string;
-  label: string;
-  icon: string;
+interface JoystickPosition {
+  x: number;
+  y: number;
 }
 
-const MOTIONS: Motion[] = [
+const MOTIONS = [
   { id: 0, name: 'wave', label: '挥手', icon: '👋' },
   { id: 1, name: 'greet', label: '问候', icon: '🙂' },
+  { id: 2, name: 'nod', label: '点头', icon: '😊' },
+  { id: 3, name: 'shake', label: '摇头', icon: '😐' },
+  { id: 4, name: 'turnLeft', label: '左转', icon: '⬅️' },
+  { id: 5, name: 'turnRight', label: '右转', icon: '➡️' },
 ];
 
-// Blender 动画
 const ANIMATIONS = [
   { id: 'think', name: '思考', json: thinkAnimationJson as BlenderAnimation },
   { id: 'sleep', name: '睡觉', json: sleepAnimationJson as BlenderAnimation },
   { id: 'test', name: '测试', json: testAnimationJson as BlenderAnimation },
-  { id: 'execute', name: '执行', json: executeAnimationJson as BlenderAnimation },
-  { id: 'fail', name: '失败', json: failAnimationJson as BlenderAnimation },
-  { id: 'speak', name: '说话', json: speakAnimationJson as BlenderAnimation },
-  { id: 'success', name: '成功', json: successAnimationJson as BlenderAnimation },
-  { id: 'thinking', name: '思考2', json: thinkingAnimationJson as BlenderAnimation },
 ];
 
 export const MotionPage: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const { status, deviceInfo, sendCommand } = useBluetooth();
-  const [selectedTab, setSelectedTab] = useState<'preset' | 'animation'>('preset');
+  const navigation = useNavigation();
+  const { status, sendCommand } = useBluetooth();
   const [selectedMotion, setSelectedMotion] = useState<number | null>(null);
   const [selectedAnimation, setSelectedAnimation] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
 
   const isConnected = status === BluetoothStatus.Connected;
+
+  // Joystick 位置
+  const joystickPosition = useRef<JoystickPosition>({ x: 129.094, y: 126.66 });
 
   // 发送命令
   const sendBLECommand = useCallback(async (command: string) => {
@@ -82,8 +76,7 @@ export const MotionPage: React.FC = () => {
         characteristicUUID: BLUETOOTH_UUIDS.SERVO_CTRL,
         type: 'response',
       });
-      console.log('发送命令:', command);
-    } catch (err: any) {
+    } catch (err) {
       console.error('发送命令失败:', err);
     }
   }, [sendCommand]);
@@ -94,7 +87,6 @@ export const MotionPage: React.FC = () => {
       Alert.alert('提示', '请先连接蓝牙设备');
       return;
     }
-
     try {
       const command = COMMANDS.PLAY_ACTION(actionId);
       await sendCommand({
@@ -103,53 +95,57 @@ export const MotionPage: React.FC = () => {
         characteristicUUID: BLUETOOTH_UUIDS.ACTION_CTRL,
         type: 'response',
       });
-      console.log('发送动作命令:', command);
     } catch (err: any) {
-      console.error('发送动作命令失败:', err);
-      Alert.alert('错误', err.message || '发送命令失败，请确保已连接到 ESP_ROBOT 设备');
+      Alert.alert('错误', err.message || '发送命令失败');
     }
   }, [isConnected, sendCommand]);
 
-  // 播放动画
-  const playAnimation = useCallback(async (animation: typeof ANIMATIONS[0]) => {
-    if (!isConnected) {
-      Alert.alert('提示', '请先连接蓝牙设备');
-      return;
-    }
+  // Joystick PanResponder
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderMove: (_, gestureState) => {
+        const { dx, dy } = gestureState;
+        const newX = 129.094 + dx;
+        const newY = 126.66 + dy;
 
-    try {
-      const parsed = parseBlenderAnimation(animation.json, animation.name);
-      console.log('解析动画:', parsed.name, '时长:', parsed.duration, 'ms');
-      console.log('命令数量:', parsed.servoCommands.length);
+        const distance = Math.sqrt(Math.pow(newX - 129.094, 2) + Math.pow(newY - 126.66, 2));
+        const maxDistance = 43;
 
-      const commands = generateESP32Commands(parsed);
+        if (distance <= maxDistance) {
+          joystickPosition.current = { x: newX, y: newY };
+        } else {
+          const angle = Math.atan2(newY - 126.66, newX - 129.094);
+          joystickPosition.current = {
+            x: 129.094 + Math.cos(angle) * maxDistance,
+            y: 126.66 + Math.sin(angle) * maxDistance,
+          };
+        }
 
-      for (const cmd of commands) {
-        await sendBLECommand(cmd);
-        await new Promise<void>(resolve => {
-          setTimeout(() => resolve(), 10);
-        });
-      }
+        const normalizedX = (joystickPosition.current.x - 129.094) / maxDistance;
+        const normalizedY = (joystickPosition.current.y - 126.66) / maxDistance;
 
-      console.log('动画命令发送完成');
-      setIsPlaying(true);
-
-      setTimeout(() => {
-        setIsPlaying(false);
-        setSelectedAnimation(null);
-      }, parsed.duration);
-    } catch (err: any) {
-      console.error('播放动画失败:', err);
-      Alert.alert('错误', '播放动画失败');
-    }
-  }, [isConnected, sendBLECommand]);
+        if (Math.abs(normalizedX) > 0.1) {
+          const pitchAngle = 90 + Math.round(normalizedX * 30);
+          sendBLECommand(COMMANDS.SET_SERVO(0, Math.max(10, Math.min(170, pitchAngle))));
+        }
+        if (Math.abs(normalizedY) > 0.1) {
+          const yawAngle = 120 - Math.round(normalizedY * 30);
+          sendBLECommand(COMMANDS.SET_SERVO(1, Math.max(45, Math.min(150, yawAngle))));
+        }
+      },
+      onPanResponderRelease: () => {
+        joystickPosition.current = { x: 129.094, y: 126.66 };
+      },
+    })
+  ).current;
 
   const handleMotionPress = (motionId: number) => {
     if (!isConnected) {
       Alert.alert('提示', '请先连接蓝牙设备');
       return;
     }
-
     if (selectedMotion === motionId) {
       setSelectedMotion(null);
       setIsPlaying(false);
@@ -166,7 +162,6 @@ export const MotionPage: React.FC = () => {
       Alert.alert('提示', '请先连接蓝牙设备');
       return;
     }
-
     if (selectedAnimation === animationId) {
       setSelectedAnimation(null);
       setIsPlaying(false);
@@ -181,6 +176,28 @@ export const MotionPage: React.FC = () => {
     }
   };
 
+  const playAnimation = useCallback(async (animation: typeof ANIMATIONS[0]) => {
+    if (!isConnected) {
+      Alert.alert('提示', '请先连接蓝牙设备');
+      return;
+    }
+    try {
+      const parsed = parseBlenderAnimation(animation.json, animation.name);
+      const commands = generateESP32Commands(parsed);
+      for (const cmd of commands) {
+        await sendBLECommand(cmd);
+        await new Promise<void>(resolve => setTimeout(() => resolve(), 10));
+      }
+      setIsPlaying(true);
+      setTimeout(() => {
+        setIsPlaying(false);
+        setSelectedAnimation(null);
+      }, parsed.duration);
+    } catch (err) {
+      Alert.alert('错误', '播放动画失败');
+    }
+  }, [isConnected, sendBLECommand]);
+
   const handleStop = () => {
     setIsPlaying(false);
     setSelectedMotion(null);
@@ -191,148 +208,191 @@ export const MotionPage: React.FC = () => {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* 页眉 */}
+    <View style={styles.container}>
+      <View style={{ height: insets.top, backgroundColor: COLORS.white }} />
+      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.headerButton}>
-          <View style={styles.backButton}>
-            <View style={[styles.backLine, { transform: [{ rotate: '45deg' }], left: 5, top: 6 }]} />
-            <View style={[styles.backLine, { transform: [{ rotate: '-45deg' }], left: 5, top: 14 }]} />
-          </View>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Motion</Text>
-        <TouchableOpacity style={styles.headerButton}>
-          <View style={styles.addIcon}>
-            <View style={[styles.addLine, { transform: [{ rotate: '0deg' }] }]} />
-            <View style={[styles.addLine, { transform: [{ rotate: '90deg' }] }]} />
-          </View>
-        </TouchableOpacity>
-      </View>
-
-      {/* 时间按钮栏 */}
-      <View style={styles.timeBar}>
-        <TouchableOpacity
-          style={[
-            styles.tabButton,
-            selectedTab === 'preset' && styles.tabButtonActive,
-          ]}
-          onPress={() => setSelectedTab('preset')}
-        >
-          <Text
-            style={[
-              styles.tabButtonText,
-              selectedTab === 'preset' ? styles.tabButtonTextActive : styles.tabButtonTextNormal,
-            ]}
+        <View style={styles.headerContent}>
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.8}
           >
-            Preset
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.tabButton,
-            selectedTab === 'animation' && styles.tabButtonActive,
-          ]}
-          onPress={() => setSelectedTab('animation')}
-        >
-          <Text
-            style={[
-              styles.tabButtonText,
-              selectedTab === 'animation' ? styles.tabButtonTextActive : styles.tabButtonTextNormal,
-            ]}
-          >
-            Animation
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* 机器人显示区域 */}
-      <View style={styles.robotSection}>
-        <View style={styles.robotCard}>
-          <Image
-            source={require('../../assets/images/robot_watcher.png')}
-            style={styles.robotImage}
-            resizeMode="contain"
-          />
-          <Text style={styles.robotLabel}>
-            {isConnected ? (deviceInfo?.name || 'Watcher-01') : '未连接'}
-          </Text>
+            <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+              <Path
+                d="M9.23544 11.9995L17.3905 19.8827C17.8711 20.3481 17.8711 21.1014 17.3905 21.5653C16.9098 22.03 16.13 22.03 15.6494 21.5653L6.62452 12.8406C6.14458 12.376 6.14458 11.6223 6.62452 11.1591L15.6494 2.43481C15.8905 2.20246 16.2055 2.0863 16.5207 2.0863C16.8358 2.0863 17.1509 2.20248 17.3905 2.43555C17.8711 2.90024 17.8711 3.65242 17.3905 4.1171L9.23544 11.9995Z"
+                fill="black"
+              />
+            </Svg>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>MOTION</Text>
         </View>
       </View>
 
-      {/* 底部白色卡片 */}
+      {/* Robot Image Section */}
+      <View style={styles.robotSection}>
+        <Image
+          source={require('../../assets/images/robot_watcher.png')}
+          style={styles.robotImage}
+          resizeMode="contain"
+        />
+      </View>
+
+      {/* Bottom Card - 参考 DancePage 布局 */}
       <View style={styles.bottomCard}>
-        <View style={styles.contentArea}>
-          <Text style={styles.otherTitle}>Other</Text>
+        {/* Joystick Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Joystick</Text>
 
-          {/* 预设动作网格 */}
-          {selectedTab === 'preset' && (
-            <View style={styles.iconGrid}>
-              {MOTIONS.map((motion) => (
-                <TouchableOpacity
-                  key={motion.id}
-                  style={[
-                    styles.iconItem,
-                    selectedMotion === motion.id && styles.iconItemSelected,
-                  ]}
-                  onPress={() => handleMotionPress(motion.id)}
-                >
-                  <View style={styles.iconImage}>
-                    <Text style={styles.iconEmoji}>{motion.icon}</Text>
-                  </View>
-                  <Text style={[
-                    styles.iconLabel,
-                    selectedMotion === motion.id && styles.iconLabelActive,
-                  ]}>
-                    {motion.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-              {/* 添加更多预设动作的占位符 */}
-              <View style={styles.iconItem}>
-                <View style={styles.iconImage} />
-                <Text style={styles.iconLabel}>待添加</Text>
-              </View>
-              <View style={styles.iconItem}>
-                <View style={styles.iconImage} />
-                <Text style={styles.iconLabel}>待添加</Text>
-              </View>
+          <View style={styles.joystickContainer}>
+            <View style={styles.joystickPanArea} {...panResponder.panHandlers}>
+              <View style={styles.joystickSvgWrapper}>
+                {/* White ring image */}
+                <Image
+                  source={require('../../assets/icons/Subtract.svg')}
+                  style={{ width: 259, height: 259, position: 'absolute' }}
+                  resizeMode="contain"
+                />
+
+                <Svg width={259} height={259} viewBox="0 0 259 259">
+                  <Defs>
+                    <LinearGradient id="greenGradient" x1="129.991" y1="103.343" x2="129.094" y2="166.568">
+                      <Stop offset="0" stopColor={COLORS.green} />
+                      <Stop offset="1" stopColor={COLORS.greenDark} />
+                    </LinearGradient>
+                  </Defs>
+
+                    {/* Direction arrows */}
+                    <Path
+                      d="M129.608 55.2565C129.921 54.7156 130.701 54.7156 131.014 55.2565L138.743 68.6447C139.056 69.1856 138.665 69.8618 138.041 69.8618H122.581C121.957 69.8618 121.566 69.1856 121.879 68.6447L129.608 55.2565Z"
+                      fill={COLORS.green}
+                    />
+                    <Path
+                      d="M128.797 201.309C129.109 201.85 129.89 201.85 130.202 201.309L137.932 187.921C138.244 187.38 137.854 186.704 137.229 186.704H121.77C121.145 186.704 120.755 187.38 121.067 187.921L128.797 201.309Z"
+                      fill={COLORS.green}
+                    />
+                    <Path
+                      d="M57.6907 127.986C57.1498 128.298 57.1498 129.079 57.6907 129.391L71.0789 137.121C71.6198 137.433 72.296 137.043 72.296 136.418L72.296 120.959C72.296 120.334 71.6198 119.944 71.0789 120.256L57.6907 127.986Z"
+                      fill={COLORS.green}
+                    />
+                    <Path
+                      d="M204.554 127.986C205.095 128.298 205.095 129.079 204.554 129.391L191.166 137.121C190.625 137.433 189.949 137.043 189.949 136.418L189.949 120.959C189.949 120.334 190.625 119.944 191.166 120.256L204.554 127.986Z"
+                      fill={COLORS.green}
+                    />
+
+                    {/* Knob - outer gray circle */}
+                    <Ellipse
+                      cx={129.094 + (joystickPosition.current.x - 129.094)}
+                      cy={126.66 + (joystickPosition.current.y - 126.66)}
+                      rx={26}
+                      ry={26}
+                      fill={COLORS.lightGray}
+                    />
+                    {/* Knob - circle with green gradient stroke */}
+                    <Ellipse
+                      cx={129.094 + (joystickPosition.current.x - 129.094)}
+                      cy={126.66 + (joystickPosition.current.y - 126.66)}
+                      rx={21.5022}
+                      ry={21.5022}
+                      stroke="url(#greenGradient)"
+                      strokeWidth={8.11404}
+                    />
+                    {/* Knob - inner gray circle (fills the hollow center) */}
+                    <Ellipse
+                      cx={129.094 + (joystickPosition.current.x - 129.094)}
+                      cy={126.66 + (joystickPosition.current.y - 126.66)}
+                      rx={17.5}
+                      ry={17.5}
+                      fill={COLORS.lightGray}
+                    />
+                  </Svg>
+                </View>
             </View>
-          )}
+          </View>
 
-          {/* Blender 动画网格 */}
-          {selectedTab === 'animation' && (
-            <ScrollView style={styles.animationScroll}>
-              <View style={styles.iconGrid}>
-                {ANIMATIONS.map((animation) => (
-                  <TouchableOpacity
-                    key={animation.id}
-                    style={[
-                      styles.iconItem,
-                      selectedAnimation === animation.id && styles.iconItemSelected,
-                    ]}
-                    onPress={() => handleAnimationPress(animation.id)}
-                  >
-                    <View style={styles.iconImage}>
-                      <Text style={styles.iconEmoji}>🎬</Text>
-                    </View>
-                    <Text
-                      style={[
-                        styles.iconLabel,
-                        selectedAnimation === animation.id && styles.iconLabelActive,
-                      ]}
-                    >
-                      {animation.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
-          )}
+          <View style={styles.separator} />
+        </View>
 
-          {/* 停止按钮 */}
+        {/* Dance Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Dance</Text>
+
+          {/* Row 1 */}
+          <View style={styles.iconGrid}>
+            {MOTIONS.slice(0, 3).map((motion) => (
+              <TouchableOpacity
+                key={motion.id}
+                style={[
+                  styles.iconItem,
+                  selectedMotion === motion.id && styles.iconItemActive,
+                ]}
+                onPress={() => handleMotionPress(motion.id)}
+              >
+                <View style={styles.iconImagePlaceholder}>
+                  <Text style={styles.robotIcon}>{motion.icon}</Text>
+                </View>
+                <Text style={[
+                  styles.iconLabel,
+                  selectedMotion === motion.id && styles.iconLabelSelected,
+                ]}>
+                  Watcher-03
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Row 2 */}
+          <View style={styles.iconGrid}>
+            {MOTIONS.slice(3, 6).map((motion) => (
+              <TouchableOpacity
+                key={motion.id}
+                style={[
+                  styles.iconItem,
+                  selectedMotion === motion.id && styles.iconItemActive,
+                ]}
+                onPress={() => handleMotionPress(motion.id)}
+              >
+                <View style={styles.iconImagePlaceholder}>
+                  <Text style={styles.robotIcon}>{motion.icon}</Text>
+                </View>
+                <Text style={[
+                  styles.iconLabel,
+                  selectedMotion === motion.id && styles.iconLabelSelected,
+                ]}>
+                  Watcher-03
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Row 3 - Animations */}
+          <View style={styles.iconGrid}>
+            {ANIMATIONS.map((animation) => (
+              <TouchableOpacity
+                key={animation.id}
+                style={[
+                  styles.iconItem,
+                  selectedAnimation === animation.id && styles.iconItemActive,
+                ]}
+                onPress={() => handleAnimationPress(animation.id)}
+              >
+                <View style={styles.iconImagePlaceholder}>
+                  <Text style={styles.robotIcon}>🎬</Text>
+                </View>
+                <Text style={[
+                  styles.iconLabel,
+                  selectedAnimation === animation.id && styles.iconLabelSelected,
+                ]}>
+                  {animation.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Stop Button */}
           {isPlaying && (
             <TouchableOpacity style={styles.stopButton} onPress={handleStop}>
-              <Text style={styles.stopButtonText}>停止</Text>
+              <Text style={styles.stopButtonText}>停止播放</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -344,110 +404,47 @@ export const MotionPage: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F9',
+    backgroundColor: COLORS.background,
   },
   header: {
     height: 44,
-    backgroundColor: '#F5F5F9',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    backgroundColor: COLORS.white,
     paddingHorizontal: 30,
+    justifyContent: 'center',
+  },
+  headerContent: {
+    width: '100%',
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
   },
   headerButton: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
     width: 24,
     height: 24,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  backButton: {
-    width: 24,
-    height: 24,
-    position: 'relative',
-  },
-  backLine: {
-    position: 'absolute',
-    width: 11.5,
-    height: 1.5,
-    backgroundColor: '#000',
-  },
-  addIcon: {
-    width: 18,
-    height: 18,
-    position: 'relative',
-  },
-  addLine: {
-    position: 'absolute',
-    width: 18,
-    height: 1.5,
-    backgroundColor: '#8FC31F',
-    top: 8,
-    left: 0,
   },
   headerTitle: {
     fontFamily: 'SF Pro',
     fontSize: 18,
+    lineHeight: 18,
     fontWeight: '500',
     color: '#1A1A1A',
-  },
-  timeBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    height: 50,
-    marginHorizontal: 20,
-    marginTop: 22,
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 30,
-    padding: 4,
-  },
-  tabButton: {
-    flex: 0.49,
-    height: 42,
-    backgroundColor: 'transparent',
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  tabButtonActive: {
-    backgroundColor: COLORS.white,
-    shadowColor: '#0000001A',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 1,
-    shadowRadius: 7.35,
-    elevation: 2,
-  },
-  tabButtonText: {
-    fontFamily: 'Inter',
-    fontSize: 14,
     textAlign: 'center',
-  },
-  tabButtonTextActive: {
-    fontWeight: '700',
-    color: COLORS.textDark,
-  },
-  tabButtonTextNormal: {
-    fontWeight: '400',
-    color: COLORS.textGray,
   },
   robotSection: {
     alignItems: 'center',
-    marginTop: 16,
-  },
-  robotCard: {
-    alignItems: 'center',
-    gap: 16,
+    paddingVertical: 20,
   },
   robotImage: {
     width: 173,
     height: 182,
   },
-  robotLabel: {
-    fontFamily: 'SF Pro',
-    fontSize: 18,
-    fontWeight: '500',
-    color: '#000000',
-    textAlign: 'center',
-  },
+  // 底部卡片 - 参考 DancePage
   bottomCard: {
     flex: 1,
     backgroundColor: COLORS.white,
@@ -456,65 +453,87 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 20 + 34,
+    marginLeft: 20,
+    marginRight: 20,
   },
-  contentArea: {
-    flex: 1,
+  section: {
+    marginBottom: 20,
   },
-  otherTitle: {
+  sectionTitle: {
     fontFamily: 'Inter',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '500',
-    color: COLORS.black,
+    color: COLORS.gray,
     marginBottom: 16,
   },
-  iconGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
+  joystickContainer: {
+    alignItems: 'center',
   },
-  iconItem: {
-    width: 107,
-    borderRadius: 12,
-    backgroundColor: COLORS.bgGray,
-    padding: 13,
-    gap: 12,
-  },
-  iconItemSelected: {
-    backgroundColor: '#E8F5E9',
-    borderWidth: 1.5,
-    borderColor: COLORS.greenStroke,
-  },
-  iconImage: {
-    width: 81,
-    height: 85,
-    backgroundColor: '#E0E0E0',
-    borderRadius: 8,
+  joystickPanArea: {
+    width: 259,
+    height: 259,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  iconEmoji: {
-    fontSize: 40,
+  joystickSvgWrapper: {
+    width: 259,
+    height: 259,
+    backgroundColor: 'transparent',
+    position: 'relative',
+  },
+  separator: {
+    height: 1,
+    backgroundColor: COLORS.separator,
+    marginTop: 20,
+  },
+  // 图标网格 - 参考 DancePage iconGrid
+  iconGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 16,
+    marginBottom: 16,
+  },
+  // 图标项 - 参考 DancePage iconItem
+  iconItem: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 13,
+    alignItems: 'center',
+    maxWidth: 107,
+  },
+  iconItemActive: {
+    backgroundColor: COLORS.lightGray,
+  },
+  iconLabelSelected: {
+    fontWeight: '500',
+  },
+  iconImagePlaceholder: {
+    width: '100%',
+    height: 85,
+    backgroundColor: COLORS.lightGray,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  robotIcon: {
+    fontSize: 32,
   },
   iconLabel: {
     fontFamily: 'Inter',
     fontSize: 14,
-    fontWeight: '400',
-    color: COLORS.textGray,
+    fontWeight: 'normal',
+    color: COLORS.black,
     textAlign: 'center',
-  },
-  iconLabelActive: {
-    fontWeight: '500',
-    color: COLORS.textDark,
-  },
-  animationScroll: {
-    flex: 1,
   },
   stopButton: {
     backgroundColor: '#FF3B30',
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
-    marginTop: 16,
+    marginTop: 8,
   },
   stopButtonText: {
     color: COLORS.white,

@@ -1,95 +1,222 @@
 import React from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
   Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Svg, Path } from 'react-native-svg';
-import { useNavigation } from '@react-navigation/native';
+import {useNavigation} from '@react-navigation/native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import Svg, {Path} from 'react-native-svg';
+
+const COLORS = {
+  background: '#F0F0F6',
+  white: '#FFFFFF',
+  text: '#1A1A1A',
+  muted: '#79797B',
+  cardTitle: '#7A7A7A',
+  green: '#8FC31F',
+  thumbBorder: '#0F0F10',
+};
+
+const THUMBNAIL_SIZE = 54;
+
+type ThumbnailItem =
+  | {type: 'image'; uri: string}
+  | {type: 'composite'; backgroundUri: string; overlayUri: string}
+  | {type: 'placeholder'};
+
+const GROUPS: Array<{title: string; items: ThumbnailItem[]}> = [
+  {
+    title: 'Standby',
+    items: [
+      {
+        type: 'image',
+        uri: 'https://www.figma.com/api/mcp/asset/e707ac63-515b-4215-8c41-69eecb0fe07c',
+      },
+      {
+        type: 'image',
+        uri: 'https://www.figma.com/api/mcp/asset/41d3d237-fff8-4284-913a-acf27762bc08',
+      },
+      {
+        type: 'image',
+        uri: 'https://www.figma.com/api/mcp/asset/fce20d30-ba49-49cf-95dd-1cdfcafddb8c',
+      },
+      {
+        type: 'image',
+        uri: 'https://www.figma.com/api/mcp/asset/a9c1f613-d38c-4d61-8edf-653aaf6c99b4',
+      },
+      {type: 'placeholder'},
+    ],
+  },
+  {
+    title: 'Listening',
+    items: [
+      {
+        type: 'composite',
+        backgroundUri:
+          'https://www.figma.com/api/mcp/asset/25de3c5a-723d-4641-b1ef-e7627a9a1f26',
+        overlayUri:
+          'https://www.figma.com/api/mcp/asset/7096b6cc-59af-4e37-87a5-82fa8c3a812a',
+      },
+      {
+        type: 'composite',
+        backgroundUri:
+          'https://www.figma.com/api/mcp/asset/f6870895-f5c4-4961-a81b-0ab4c8afe825',
+        overlayUri:
+          'https://www.figma.com/api/mcp/asset/7096b6cc-59af-4e37-87a5-82fa8c3a812a',
+      },
+      {type: 'placeholder'},
+      {type: 'placeholder'},
+      {type: 'placeholder'},
+    ],
+  },
+  {
+    title: 'Speaking',
+    items: [
+      {
+        type: 'image',
+        uri: 'https://www.figma.com/api/mcp/asset/40ee32b8-1ba5-4a76-b2c3-c7326fd160d3',
+      },
+      {
+        type: 'image',
+        uri: 'https://www.figma.com/api/mcp/asset/fdc748f8-0551-4353-8f9b-03ddcf2eabc2',
+      },
+      {
+        type: 'image',
+        uri: 'https://www.figma.com/api/mcp/asset/b8edf019-7cbd-4d88-bccc-5436c10c1699',
+      },
+      {type: 'placeholder'},
+      {type: 'placeholder'},
+    ],
+  },
+  {
+    title: 'Watching Space',
+    items: [
+      {
+        type: 'image',
+        uri: 'https://www.figma.com/api/mcp/asset/85941a61-4b07-4b18-b52b-9e18d1ffcbb1',
+      },
+      {
+        type: 'image',
+        uri: 'https://www.figma.com/api/mcp/asset/1e4855df-5937-43b1-86bb-d7af1c74da1e',
+      },
+      {
+        type: 'image',
+        uri: 'https://www.figma.com/api/mcp/asset/cb7d2420-e551-4112-91d1-3d6cacba539c',
+      },
+      {
+        type: 'image',
+        uri: 'https://www.figma.com/api/mcp/asset/60904e85-c4cf-447a-8dff-1c36b94fa2d6',
+      },
+      {
+        type: 'image',
+        uri: 'https://www.figma.com/api/mcp/asset/998567e2-ee91-4bfd-bc0e-3b297eb0350b',
+      },
+    ],
+  },
+];
+
+const PlayIcon: React.FC = () => (
+  <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M7 4.8C7 3.72 8.212 3.094 9.086 3.72L18.685 10.92C19.405 11.46 19.405 12.54 18.685 13.08L9.086 20.28C8.212 20.906 7 20.28 7 19.2V4.8Z"
+      fill={COLORS.green}
+    />
+  </Svg>
+);
+
+const BackIcon: React.FC = () => (
+  <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M9.23544 11.9995L17.3905 19.8827C17.8711 20.3481 17.8711 21.1014 17.3905 21.5653C16.9098 22.03 16.13 22.03 15.6494 21.5653L6.62452 12.8406C6.14458 12.376 6.14458 11.6223 6.62452 11.1591L15.6494 2.43481C15.8905 2.20246 16.2055 2.0863 16.5207 2.0863C16.8358 2.0863 17.1509 2.20248 17.3905 2.43555C17.8711 2.90024 17.8711 3.65242 17.3905 4.1171L9.23544 11.9995Z"
+      fill="#000000"
+    />
+  </Svg>
+);
+
+const GroupCard: React.FC<{title: string; items: ThumbnailItem[]}> = ({
+  title,
+  items,
+}) => (
+  <View style={styles.card}>
+    <View style={styles.cardHeader}>
+      <Text style={styles.cardTitle}>{title}</Text>
+      <TouchableOpacity style={styles.playButton} activeOpacity={0.8}>
+        <PlayIcon />
+      </TouchableOpacity>
+    </View>
+
+    <View style={styles.thumbnailRow}>
+      {items.map((item, index) => {
+        if (item.type === 'placeholder') {
+          return <View key={`${title}-${index}`} style={styles.placeholder} />;
+        }
+
+        if (item.type === 'composite') {
+          return (
+            <View key={`${title}-${index}`} style={styles.thumbnail}>
+              <Image source={{uri: item.backgroundUri}} style={styles.thumbnailImage} />
+              <Image
+                source={{uri: item.overlayUri}}
+                style={styles.thumbnailOverlay}
+                resizeMode="contain"
+              />
+            </View>
+          );
+        }
+
+        return (
+          <View key={`${title}-${index}`} style={styles.thumbnail}>
+            <Image source={{uri: item.uri}} style={styles.thumbnailImage} />
+          </View>
+        );
+      })}
+    </View>
+  </View>
+);
 
 /**
  * Animation 页面
  */
-
-const COLORS = {
-  background: '#F5F5F9',
-  black: '#000000',
-  white: '#FFFFFF',
-  gray: '#636A74',
-  lightGray: '#E1E1E7',
-};
-
 export const AnimationPage: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* ===== Header ===== */}
+    <View style={styles.container}>
+      <View style={{height: insets.top, backgroundColor: COLORS.white}} />
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.headerButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-            <Path
-              d="M15.41 7.41L14 6L8 12L14 18L15.41 16.59L10.83 12L15.41 7.41Z"
-              fill={COLORS.black}
-            />
-          </Svg>
-        </TouchableOpacity>
-
-        <Text style={styles.headerTitle}>Animation</Text>
-
-        <TouchableOpacity style={styles.headerButton}>
-          <Svg width={18} height={18} viewBox="0 0 18 18" fill="none">
-            <Path
-              d="M9 10.5C9.82843 10.5 10.5 9.82843 10.5 9C10.5 8.17157 9.82843 7.5 9 7.5C8.17157 7.5 7.5 8.17157 7.5 9C7.5 9.82843 8.17157 10.5 9 10.5Z"
-              fill={COLORS.black}
-            />
-            <Path
-              d="M9 4.5C9.82843 4.5 10.5 3.82843 10.5 3C10.5 2.17157 9.82843 1.5 9 1.5C8.17157 1.5 7.5 2.17157 7.5 3C7.5 3.82843 8.17157 4.5 9 4.5Z"
-              fill={COLORS.black}
-            />
-            <Path
-              d="M9 16.5C9.82843 16.5 10.5 15.8284 10.5 14.5C10.5 13.1716 9.82843 12.5 9 12.5C8.17157 12.5 7.5 13.1716 7.5 14.5C7.5 15.8284 8.17157 16.5 9 16.5Z"
-              fill={COLORS.black}
-            />
-          </Svg>
-        </TouchableOpacity>
-      </View>
-
-      {/* ===== 主内容区 ===== */}
-      <View style={styles.contentArea}>
-        <Text style={styles.sectionTitle}>Other</Text>
-
-        <View style={styles.buttonRow}>
-          <TouchableOpacity style={styles.discoverButton}>
-            <Text style={styles.discoverButtonText}>Discover</Text>
+        <View style={styles.headerContent}>
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.8}>
+            <BackIcon />
           </TouchableOpacity>
-
-          <TouchableOpacity style={styles.customButton}>
-            <Text style={styles.customButtonText}>Customization</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.contentCard}>
-          <Image
-            source={require('../../assets/images/robot_watcher.png')}
-            style={styles.cardImage}
-            resizeMode="contain"
-          />
-          <Text style={styles.cardText}>Watcher-01</Text>
+          <Text style={styles.headerTitle}>Anomation</Text>
         </View>
       </View>
 
-      {/* ===== 底部时间栏 ===== */}
-      <View style={[styles.bottomBar, { paddingBottom: insets.bottom }]}>
-        <Text style={styles.timeLabel}>时间</Text>
-      </View>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={[
+          styles.scrollContent,
+          {paddingBottom: insets.bottom + 24},
+        ]}
+        showsVerticalScrollIndicator={false}>
+        <Text style={styles.description}>
+          {`Feel free to upload your prefer faces to create your\nunique watcher! Make sure the images are:\n- PNG format\n- 412x412 px size\nThe frame rate is 500 ms per image, please design\nyour animation accordingly,`}
+        </Text>
+
+        <View style={styles.cardList}>
+          {GROUPS.map(group => (
+            <GroupCard key={group.title} title={group.title} items={group.items} />
+          ))}
+        </View>
+      </ScrollView>
     </View>
   );
 };
@@ -97,109 +224,112 @@ export const AnimationPage: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F9',
+    backgroundColor: COLORS.background,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    height: 44,
+    backgroundColor: COLORS.white,
     paddingHorizontal: 30,
-    backgroundColor: '#F5F5F9',
+    height: 44,
+    justifyContent: 'center',
+  },
+  headerContent: {
+    width: '100%',
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
   },
   headerButton: {
-    width: 44,
-    height: 44,
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    width: 24,
+    height: 24,
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerTitle: {
     fontFamily: 'SF Pro',
     fontSize: 18,
+    lineHeight: 18,
     fontWeight: '500',
-    color: '#000000',
+    color: COLORS.text,
+    textAlign: 'center',
   },
-  contentArea: {
+  scrollView: {
     flex: 1,
+  },
+  scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 24,
   },
-  sectionTitle: {
+  description: {
     fontFamily: 'Inter',
     fontSize: 14,
-    fontWeight: '500',
-    color: '#000000',
-    marginBottom: 10,
+    lineHeight: 21,
+    fontWeight: '400',
+    color: COLORS.muted,
   },
-  buttonRow: {
+  cardList: {
+    gap: 16,
+    marginTop: 16,
+  },
+  card: {
+    backgroundColor: COLORS.white,
+    borderRadius: 8,
+    padding: 16,
+  },
+  cardHeader: {
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 20,
-  },
-  discoverButton: {
-    flex: 1,
-    height: 42,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 30,
-    justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 7.35,
-    elevation: 2,
+    justifyContent: 'space-between',
+    marginBottom: 19,
   },
-  discoverButtonText: {
+  cardTitle: {
     fontFamily: 'Inter',
     fontSize: 14,
-    fontWeight: '600',
-    color: '#000000',
-  },
-  customButton: {
-    flex: 1,
-    height: 42,
-    backgroundColor: 'transparent',
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  customButtonText: {
-    fontFamily: 'Inter',
-    fontSize: 14,
+    lineHeight: 14,
     fontWeight: '400',
-    color: '#636A74',
+    color: COLORS.cardTitle,
   },
-  contentCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    width: '100%',
-    padding: 24,
+  playButton: {
+    width: 24,
+    height: 24,
     alignItems: 'center',
-  },
-  cardImage: {
-    width: '100%',
-    height: 182,
-    marginBottom: 16,
-  },
-  cardText: {
-    fontFamily: 'SF Pro',
-    fontSize: 18,
-    fontWeight: '500',
-    color: '#000000',
-  },
-  bottomBar: {
-    height: 50,
-    backgroundColor: '#E1E1E7',
     justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 30,
-    marginHorizontal: 20,
-    marginBottom: 20,
   },
-  timeLabel: {
-    fontFamily: 'Inter',
-    fontSize: 14,
-    fontWeight: '400',
-    color: '#636A74',
+  thumbnailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  thumbnail: {
+    width: THUMBNAIL_SIZE,
+    height: THUMBNAIL_SIZE,
+    borderRadius: THUMBNAIL_SIZE / 2,
+    borderWidth: 1,
+    borderColor: COLORS.thumbBorder,
+    overflow: 'hidden',
+    backgroundColor: '#111113',
+  },
+  thumbnailImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: THUMBNAIL_SIZE / 2,
+  },
+  thumbnailOverlay: {
+    position: 'absolute',
+    top: 17,
+    left: 8,
+    width: 39,
+    height: 19,
+  },
+  placeholder: {
+    width: THUMBNAIL_SIZE,
+    height: THUMBNAIL_SIZE,
+    borderRadius: 8.64,
+    borderWidth: 1,
+    borderColor: COLORS.green,
+    borderStyle: 'dashed',
   },
 });
