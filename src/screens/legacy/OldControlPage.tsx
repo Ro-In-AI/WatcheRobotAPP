@@ -35,7 +35,7 @@ const PRESETS = [
   { name: '抬头', angles: [90, 95] },
 ];
 
-export const ControlPage: React.FC = () => {
+export const OldControlPage: React.FC = () => {
   const { status, writeData, deviceInfo, error, sendCommand } = useBluetooth();
   const [angles, setAngles] = useState<number[]>([90, 120]);
   const [isSending, setIsSending] = useState(false);

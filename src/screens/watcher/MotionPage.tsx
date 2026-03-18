@@ -1,13 +1,14 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
-  ScrollView,
   TouchableOpacity,
   Alert,
+  ScrollView,
+  Image,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBluetooth, BluetoothStatus } from '../../modules/bluetooth';
 import {
   ACTIONS,
@@ -25,7 +26,19 @@ import speakAnimationJson from '../../assets/speak30fps7s-2.json';
 import successAnimationJson from '../../assets/Success30fps3s.json';
 import thinkingAnimationJson from '../../assets/thinking30fps6s.json';
 
-// 动作类型
+// 颜色常量
+const COLORS = {
+  lightGray: '#E1E1E7',
+  white: '#FFFFFF',
+  black: '#000000',
+  green: '#8FC31F',
+  greenStroke: '#8FC31F',
+  textDark: '#0D0D0D',
+  textGray: '#636A74',
+  bgGray: '#F3F5F8',
+};
+
+// 预设动作
 interface Motion {
   id: number;
   name: string;
@@ -33,13 +46,12 @@ interface Motion {
   icon: string;
 }
 
-// 可用动作 - 基于嵌入式预设动作
 const MOTIONS: Motion[] = [
   { id: 0, name: 'wave', label: '挥手', icon: '👋' },
   { id: 1, name: 'greet', label: '问候', icon: '🙂' },
 ];
 
-// 动画文件列表
+// Blender 动画
 const ANIMATIONS = [
   { id: 'think', name: '思考', json: thinkAnimationJson as BlenderAnimation },
   { id: 'sleep', name: '睡觉', json: sleepAnimationJson as BlenderAnimation },
@@ -52,12 +64,13 @@ const ANIMATIONS = [
 ];
 
 export const MotionPage: React.FC = () => {
-  const { status, writeData, deviceInfo, sendCommand } = useBluetooth();
+  const insets = useSafeAreaInsets();
+  const { status, deviceInfo, sendCommand } = useBluetooth();
+  const [selectedTab, setSelectedTab] = useState<'preset' | 'animation'>('preset');
   const [selectedMotion, setSelectedMotion] = useState<number | null>(null);
   const [selectedAnimation, setSelectedAnimation] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  // 检查是否连接
   const isConnected = status === BluetoothStatus.Connected;
 
   // 发送命令
@@ -75,7 +88,7 @@ export const MotionPage: React.FC = () => {
     }
   }, [sendCommand]);
 
-  // 发送动作命令 - 使用 sendCommand 更可靠
+  // 发送动作命令
   const sendActionCommand = useCallback(async (actionId: number) => {
     if (!isConnected) {
       Alert.alert('提示', '请先连接蓝牙设备');
@@ -105,18 +118,14 @@ export const MotionPage: React.FC = () => {
     }
 
     try {
-      // 解析动画
       const parsed = parseBlenderAnimation(animation.json, animation.name);
       console.log('解析动画:', parsed.name, '时长:', parsed.duration, 'ms');
       console.log('命令数量:', parsed.servoCommands.length);
 
-      // 生成 ESP32 命令
       const commands = generateESP32Commands(parsed);
 
-      // 依次发送所有命令
       for (const cmd of commands) {
         await sendBLECommand(cmd);
-        // 添加小延迟避免发送过快
         await new Promise<void>(resolve => {
           setTimeout(() => resolve(), 10);
         });
@@ -125,7 +134,6 @@ export const MotionPage: React.FC = () => {
       console.log('动画命令发送完成');
       setIsPlaying(true);
 
-      // 动画完成后重置状态
       setTimeout(() => {
         setIsPlaying(false);
         setSelectedAnimation(null);
@@ -137,6 +145,11 @@ export const MotionPage: React.FC = () => {
   }, [isConnected, sendBLECommand]);
 
   const handleMotionPress = (motionId: number) => {
+    if (!isConnected) {
+      Alert.alert('提示', '请先连接蓝牙设备');
+      return;
+    }
+
     if (selectedMotion === motionId) {
       setSelectedMotion(null);
       setIsPlaying(false);
@@ -149,10 +162,14 @@ export const MotionPage: React.FC = () => {
   };
 
   const handleAnimationPress = (animationId: string) => {
+    if (!isConnected) {
+      Alert.alert('提示', '请先连接蓝牙设备');
+      return;
+    }
+
     if (selectedAnimation === animationId) {
       setSelectedAnimation(null);
       setIsPlaying(false);
-      // 发送停止命令
       sendBLECommand(COMMANDS.QUEUE_CLEAR());
     } else {
       setSelectedAnimation(animationId);
@@ -164,253 +181,343 @@ export const MotionPage: React.FC = () => {
     }
   };
 
-  const handlePlayStop = () => {
-    if (isPlaying) {
-      setIsPlaying(false);
-      setSelectedMotion(null);
-      setSelectedAnimation(null);
-      // 停止动画队列
-      sendBLECommand(COMMANDS.QUEUE_CLEAR());
-      // 发送初始化角度
-      sendBLECommand(COMMANDS.SET_SERVO(0, 90));
-      sendBLECommand(COMMANDS.SET_SERVO(1, 120));
-    } else if (selectedMotion !== null) {
-      setIsPlaying(true);
-      sendActionCommand(selectedMotion);
-    } else if (selectedAnimation !== null) {
-      const animation = ANIMATIONS.find(a => a.id === selectedAnimation);
-      if (animation) {
-        playAnimation(animation);
-      }
-    }
+  const handleStop = () => {
+    setIsPlaying(false);
+    setSelectedMotion(null);
+    setSelectedAnimation(null);
+    sendBLECommand(COMMANDS.QUEUE_CLEAR());
+    sendBLECommand(COMMANDS.SET_SERVO(0, 90));
+    sendBLECommand(COMMANDS.SET_SERVO(1, 120));
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* 页眉 */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>动作控制</Text>
-        <View style={[styles.statusBadge, { backgroundColor: isConnected ? '#34C759' : '#FF3B30' }]}>
-          <Text style={styles.statusText}>
-            {isPlaying ? '运行中' : (isConnected ? '就绪' : '未连接')}
+        <TouchableOpacity style={styles.headerButton}>
+          <View style={styles.backButton}>
+            <View style={[styles.backLine, { transform: [{ rotate: '45deg' }], left: 5, top: 6 }]} />
+            <View style={[styles.backLine, { transform: [{ rotate: '-45deg' }], left: 5, top: 14 }]} />
+          </View>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Motion</Text>
+        <TouchableOpacity style={styles.headerButton}>
+          <View style={styles.addIcon}>
+            <View style={[styles.addLine, { transform: [{ rotate: '0deg' }] }]} />
+            <View style={[styles.addLine, { transform: [{ rotate: '90deg' }] }]} />
+          </View>
+        </TouchableOpacity>
+      </View>
+
+      {/* 时间按钮栏 */}
+      <View style={styles.timeBar}>
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            selectedTab === 'preset' && styles.tabButtonActive,
+          ]}
+          onPress={() => setSelectedTab('preset')}
+        >
+          <Text
+            style={[
+              styles.tabButtonText,
+              selectedTab === 'preset' ? styles.tabButtonTextActive : styles.tabButtonTextNormal,
+            ]}
+          >
+            Preset
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            selectedTab === 'animation' && styles.tabButtonActive,
+          ]}
+          onPress={() => setSelectedTab('animation')}
+        >
+          <Text
+            style={[
+              styles.tabButtonText,
+              selectedTab === 'animation' ? styles.tabButtonTextActive : styles.tabButtonTextNormal,
+            ]}
+          >
+            Animation
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* 机器人显示区域 */}
+      <View style={styles.robotSection}>
+        <View style={styles.robotCard}>
+          <Image
+            source={require('../../assets/images/robot_watcher.png')}
+            style={styles.robotImage}
+            resizeMode="contain"
+          />
+          <Text style={styles.robotLabel}>
+            {isConnected ? (deviceInfo?.name || 'Watcher-01') : '未连接'}
           </Text>
         </View>
       </View>
 
-      <ScrollView style={styles.content}>
-        {/* 连接信息 */}
-        {isConnected && deviceInfo && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>设备信息</Text>
-            <View style={styles.card}>
-              <Text style={styles.deviceName}>{deviceInfo.name || 'ESP_ROBOT'}</Text>
+      {/* 底部白色卡片 */}
+      <View style={styles.bottomCard}>
+        <View style={styles.contentArea}>
+          <Text style={styles.otherTitle}>Other</Text>
+
+          {/* 预设动作网格 */}
+          {selectedTab === 'preset' && (
+            <View style={styles.iconGrid}>
+              {MOTIONS.map((motion) => (
+                <TouchableOpacity
+                  key={motion.id}
+                  style={[
+                    styles.iconItem,
+                    selectedMotion === motion.id && styles.iconItemSelected,
+                  ]}
+                  onPress={() => handleMotionPress(motion.id)}
+                >
+                  <View style={styles.iconImage}>
+                    <Text style={styles.iconEmoji}>{motion.icon}</Text>
+                  </View>
+                  <Text style={[
+                    styles.iconLabel,
+                    selectedMotion === motion.id && styles.iconLabelActive,
+                  ]}>
+                    {motion.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              {/* 添加更多预设动作的占位符 */}
+              <View style={styles.iconItem}>
+                <View style={styles.iconImage} />
+                <Text style={styles.iconLabel}>待添加</Text>
+              </View>
+              <View style={styles.iconItem}>
+                <View style={styles.iconImage} />
+                <Text style={styles.iconLabel}>待添加</Text>
+              </View>
             </View>
-          </View>
-        )}
+          )}
 
-        {/* 动作网格 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>预设动作</Text>
-          <View style={styles.motionGrid}>
-            {MOTIONS.map((motion) => (
-              <TouchableOpacity
-                key={motion.id}
-                style={[
-                  styles.motionCard,
-                  selectedMotion === motion.id && styles.motionCardActive,
-                  !isConnected && styles.motionCardDisabled,
-                ]}
-                onPress={() => handleMotionPress(motion.id)}
-                disabled={!isConnected}
-              >
-                <Text style={styles.motionIcon}>{motion.icon}</Text>
-                <Text
-                  style={[
-                    styles.motionName,
-                    selectedMotion === motion.id && styles.motionNameActive,
-                  ]}
-                >
-                  {motion.label}
-                </Text>
-                <Text style={styles.motionDesc}>ID: {motion.id}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+          {/* Blender 动画网格 */}
+          {selectedTab === 'animation' && (
+            <ScrollView style={styles.animationScroll}>
+              <View style={styles.iconGrid}>
+                {ANIMATIONS.map((animation) => (
+                  <TouchableOpacity
+                    key={animation.id}
+                    style={[
+                      styles.iconItem,
+                      selectedAnimation === animation.id && styles.iconItemSelected,
+                    ]}
+                    onPress={() => handleAnimationPress(animation.id)}
+                  >
+                    <View style={styles.iconImage}>
+                      <Text style={styles.iconEmoji}>🎬</Text>
+                    </View>
+                    <Text
+                      style={[
+                        styles.iconLabel,
+                        selectedAnimation === animation.id && styles.iconLabelActive,
+                      ]}
+                    >
+                      {animation.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          )}
 
-        {/* Blender 动画 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Blender 动画</Text>
-          <View style={styles.motionGrid}>
-            {ANIMATIONS.map((animation) => (
-              <TouchableOpacity
-                key={animation.id}
-                style={[
-                  styles.motionCard,
-                  selectedAnimation === animation.id && styles.motionCardActive,
-                  !isConnected && styles.motionCardDisabled,
-                ]}
-                onPress={() => handleAnimationPress(animation.id)}
-                disabled={!isConnected}
-              >
-                <Text style={styles.motionIcon}>🎬</Text>
-                <Text
-                  style={[
-                    styles.motionName,
-                    selectedAnimation === animation.id && styles.motionNameActive,
-                  ]}
-                >
-                  {animation.name}
-                </Text>
-                <Text style={styles.motionDesc}>JSON 动画</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          {/* 停止按钮 */}
+          {isPlaying && (
+            <TouchableOpacity style={styles.stopButton} onPress={handleStop}>
+              <Text style={styles.stopButtonText}>停止</Text>
+            </TouchableOpacity>
+          )}
         </View>
-
-        {/* 说明 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>说明</Text>
-          <View style={styles.card}>
-            <Text style={styles.infoText}>
-              预设动作：{'\n'}
-              • ID 0 - 挥手 (wave){'\n'}
-              • ID 1 - 问候 (greet){'\n'}
-              {'\n'}Blender 动画：{'\n'}
-              • 解析 JSON 关键帧数据{'\n'}
-              • 计算时间差并发送队列命令
-            </Text>
-            <Text style={styles.infoText}>
-              {'\n'}命令格式：{'\n'}
-              • PLAY_ACTION:{"<动作ID>"}{'\n'}
-              • QUEUE_ADD:id:angle:duration:delay{'\n'}
-              • QUEUE_START / QUEUE_CLEAR
-            </Text>
-          </View>
-        </View>
-
-        {/* 播放/停止按钮 */}
-        <View style={styles.section}>
-          <TouchableOpacity
-            style={[
-              styles.playButton,
-              ((!selectedMotion && !selectedAnimation) || !isConnected) && styles.playButtonDisabled,
-            ]}
-            onPress={handlePlayStop}
-            disabled={(!selectedMotion && !selectedAnimation) || !isConnected}
-          >
-            <Text style={styles.playButtonText}>
-              {isPlaying ? '停止' : '播放'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+      </View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#F5F5F9',
   },
   header: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#F2F2F7',
+    height: 44,
+    backgroundColor: '#F5F5F9',
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 30,
+  },
+  headerButton: {
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backButton: {
+    width: 24,
+    height: 24,
+    position: 'relative',
+  },
+  backLine: {
+    position: 'absolute',
+    width: 11.5,
+    height: 1.5,
+    backgroundColor: '#000',
+  },
+  addIcon: {
+    width: 18,
+    height: 18,
+    position: 'relative',
+  },
+  addLine: {
+    position: 'absolute',
+    width: 18,
+    height: 1.5,
+    backgroundColor: '#8FC31F',
+    top: 8,
+    left: 0,
   },
   headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#000',
-  },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
-    color: '#FFF',
-    fontSize: 12,
+    fontFamily: 'SF Pro',
+    fontSize: 18,
     fontWeight: '500',
+    color: '#1A1A1A',
   },
-  content: {
-    flex: 1,
-    padding: 16,
+  timeBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    height: 50,
+    marginHorizontal: 20,
+    marginTop: 22,
+    backgroundColor: COLORS.lightGray,
+    borderRadius: 30,
+    padding: 4,
   },
-  section: {
-    marginBottom: 24,
+  tabButton: {
+    flex: 0.49,
+    height: 42,
+    backgroundColor: 'transparent',
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  sectionTitle: {
-    fontSize: 13,
-    color: '#6E6E73',
-    textTransform: 'uppercase',
-    marginBottom: 12,
-    marginLeft: 4,
+  tabButtonActive: {
+    backgroundColor: COLORS.white,
+    shadowColor: '#0000001A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 1,
+    shadowRadius: 7.35,
+    elevation: 2,
   },
-  card: {
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 16,
-  },
-  deviceName: {
-    fontSize: 16,
-    color: '#000',
-    fontWeight: '500',
-  },
-  infoText: {
+  tabButtonText: {
+    fontFamily: 'Inter',
     fontSize: 14,
-    color: '#666',
-    lineHeight: 22,
+    textAlign: 'center',
   },
-  motionGrid: {
+  tabButtonTextActive: {
+    fontWeight: '700',
+    color: COLORS.textDark,
+  },
+  tabButtonTextNormal: {
+    fontWeight: '400',
+    color: COLORS.textGray,
+  },
+  robotSection: {
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  robotCard: {
+    alignItems: 'center',
+    gap: 16,
+  },
+  robotImage: {
+    width: 173,
+    height: 182,
+  },
+  robotLabel: {
+    fontFamily: 'SF Pro',
+    fontSize: 18,
+    fontWeight: '500',
+    color: '#000000',
+    textAlign: 'center',
+  },
+  bottomCard: {
+    flex: 1,
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 20 + 34,
+  },
+  contentArea: {
+    flex: 1,
+  },
+  otherTitle: {
+    fontFamily: 'Inter',
+    fontSize: 14,
+    fontWeight: '500',
+    color: COLORS.black,
+    marginBottom: 16,
+  },
+  iconGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: 10,
+  },
+  iconItem: {
+    width: 107,
+    borderRadius: 12,
+    backgroundColor: COLORS.bgGray,
+    padding: 13,
     gap: 12,
   },
-  motionCard: {
-    width: '47%',
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 20,
+  iconItemSelected: {
+    backgroundColor: '#E8F5E9',
+    borderWidth: 1.5,
+    borderColor: COLORS.greenStroke,
+  },
+  iconImage: {
+    width: 81,
+    height: 85,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 8,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  motionCardActive: {
-    backgroundColor: '#007AFF',
-  },
-  motionCardDisabled: {
-    opacity: 0.5,
-  },
-  motionIcon: {
+  iconEmoji: {
     fontSize: 40,
-    marginBottom: 12,
   },
-  motionName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 4,
+  iconLabel: {
+    fontFamily: 'Inter',
+    fontSize: 14,
+    fontWeight: '400',
+    color: COLORS.textGray,
+    textAlign: 'center',
   },
-  motionNameActive: {
-    color: '#FFF',
+  iconLabelActive: {
+    fontWeight: '500',
+    color: COLORS.textDark,
   },
-  motionDesc: {
-    fontSize: 12,
-    color: '#8E8E93',
+  animationScroll: {
+    flex: 1,
   },
-  playButton: {
-    backgroundColor: '#34C759',
-    paddingVertical: 16,
+  stopButton: {
+    backgroundColor: '#FF3B30',
+    paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
+    marginTop: 16,
   },
-  playButtonDisabled: {
-    backgroundColor: '#C7C7CC',
-  },
-  playButtonText: {
-    color: '#FFF',
+  stopButtonText: {
+    color: COLORS.white,
     fontSize: 16,
     fontWeight: '600',
   },

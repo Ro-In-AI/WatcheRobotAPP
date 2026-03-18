@@ -10,6 +10,7 @@ export { DancePage } from './watcher/DancePage';
 export { SurveillancePage } from './watcher/SurveillancePage';
 export { AnimationPage } from './watcher/AnimationPage';
 
-// Legacy pages
-export { BluetoothPage } from './legacy/BluetoothPage';
-export { ControlPage } from './legacy/ControlPage';
+// Legacy pages (old versions, kept for reference)
+export { BluetoothPage as OldBluetoothPage } from './legacy/OldBluetoothPage';
+export { MotionPage as OldMotionPage } from './legacy/OldMotionPage';
+export { ControlPage as OldControlPage } from './legacy/OldControlPage';
