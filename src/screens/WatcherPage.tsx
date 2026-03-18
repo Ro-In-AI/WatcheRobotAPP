@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -6,10 +6,12 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { DanceIcon, MotionIcon, SurveillanceIcon } from '../components/icons';
+import { BLEPop, BluetoothStatus, useBluetooth } from '../modules/bluetooth';
 
 // 设计稿颜色提取
 const COLORS = {
@@ -30,6 +32,99 @@ const COLORS = {
  */
 export const WatcherPage: React.FC = () => {
   const insets = useSafeAreaInsets();
+  const [isBlePopVisible, setIsBlePopVisible] = useState(false);
+  const {
+    status,
+    deviceInfo,
+    error,
+    connectToConfiguredDevice,
+    stopScan,
+    disconnect,
+    clearError,
+  } = useBluetooth();
+
+  const isConnected = status === BluetoothStatus.Connected;
+  const isBusy =
+    status === BluetoothStatus.Scanning || status === BluetoothStatus.Connecting;
+
+  const connectionLabel = useMemo(() => {
+    switch (status) {
+      case BluetoothStatus.Connected:
+        return deviceInfo?.name || 'Device Connected';
+      case BluetoothStatus.Scanning:
+        return 'Scanning device...';
+      case BluetoothStatus.Connecting:
+        return 'Connecting device...';
+      case BluetoothStatus.Error:
+        return error?.message || 'Connection failed';
+      case BluetoothStatus.Disconnected:
+        return 'Device Disconnected';
+      case BluetoothStatus.Idle:
+      default:
+        return 'Device Offline';
+    }
+  }, [deviceInfo?.name, error?.message, status]);
+
+  const connectButtonText = useMemo(() => {
+    if (isConnected) {
+      return 'Disconnect device';
+    }
+
+    if (isBusy) {
+      return 'Connecting...';
+    }
+
+    return 'Connect the device';
+  }, [isBusy, isConnected]);
+
+  const statusDotStyle = useMemo(() => {
+    switch (status) {
+      case BluetoothStatus.Connected:
+        return styles.statusDotConnected;
+      case BluetoothStatus.Scanning:
+      case BluetoothStatus.Connecting:
+        return styles.statusDotPending;
+      default:
+        return styles.statusDotOffline;
+    }
+  }, [status]);
+
+  const handleConnect = useCallback(async () => {
+    if (isConnected) {
+      await disconnect();
+      return;
+    }
+
+    clearError();
+    setIsBlePopVisible(true);
+
+    try {
+      await connectToConfiguredDevice({
+        scanTimeout: 10000,
+        connectTimeout: 15000,
+        autoConnect: true,
+        enableAutoRescan: false,
+      });
+    } catch (err: any) {
+      Alert.alert('蓝牙连接失败', err?.message || '请稍后重试');
+    }
+  }, [clearError, connectToConfiguredDevice, disconnect, isConnected]);
+
+  const handleCancelBle = useCallback(async () => {
+    setIsBlePopVisible(false);
+    clearError();
+    await stopScan();
+  }, [clearError, stopScan]);
+
+  const handleCloseBle = useCallback(() => {
+    setIsBlePopVisible(false);
+  }, []);
+
+  const handleRetryBle = useCallback(() => {
+    handleConnect().catch((err) => {
+      Alert.alert('蓝牙连接失败', err?.message || '请稍后重试');
+    });
+  }, [handleConnect]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 10 }]}>
@@ -63,14 +158,22 @@ export const WatcherPage: React.FC = () => {
 
           {/* 状态行：红点 + Device Offline */}
           <View style={styles.statusRow}>
-            <View style={styles.statusDot} />
-            <Text style={styles.statusText}>Device Offline</Text>
+            <View style={[styles.statusDot, statusDotStyle]} />
+            <Text style={styles.statusText}>{connectionLabel}</Text>
           </View>
         </View>
 
         {/* ===== 核心按钮：Connect the device ===== */}
-        <TouchableOpacity style={styles.connectButton}>
-          <Text style={styles.connectButtonText}>Connect the device</Text>
+        <TouchableOpacity
+          style={[
+            styles.connectButton,
+            isConnected && styles.disconnectButton,
+            isBusy && styles.connectButtonDisabled,
+          ]}
+          onPress={handleConnect}
+          disabled={isBusy}
+        >
+          <Text style={styles.connectButtonText}>{connectButtonText}</Text>
         </TouchableOpacity>
 
         {/* ===== 功能卡片网格 (Grid Cards) ===== */}
@@ -100,6 +203,17 @@ export const WatcherPage: React.FC = () => {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <BLEPop
+        isVisible={isBlePopVisible}
+        status={status}
+        onCancel={() => {
+          handleCancelBle().catch(() => undefined);
+        }}
+        onRetry={handleRetryBle}
+        onReconnect={handleRetryBle}
+        onClose={handleCloseBle}
+      />
     </View>
   );
 };
@@ -199,7 +313,15 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
+  },
+  statusDotOffline: {
     backgroundColor: COLORS.statusRed,
+  },
+  statusDotConnected: {
+    backgroundColor: '#34C759',
+  },
+  statusDotPending: {
+    backgroundColor: '#F5B43A',
   },
 
   // 状态文字
@@ -222,6 +344,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 40,
+  },
+  disconnectButton: {
+    backgroundColor: '#363C44',
+  },
+  connectButtonDisabled: {
+    opacity: 0.7,
   },
 
   // 按钮文字
