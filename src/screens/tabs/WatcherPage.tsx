@@ -1,70 +1,110 @@
-import React, { useState } from 'react';
+import React, {useState} from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Svg, Path } from 'react-native-svg';
-import { useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { DanceIcon, MotionIcon, SurveillanceIcon, AnimationIcon } from '../../components/icons';
-
-import type { WatcherStackParamList } from '../../navigation/AppNavigator';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {Svg, Path} from 'react-native-svg';
+import {useNavigation} from '@react-navigation/native';
+import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {
+  AnimationIcon,
+  DanceIcon,
+  MotionIcon,
+  SurveillanceIcon,
+} from '../../components/icons';
+import type {WatcherStackParamList} from '../../navigation/AppNavigator';
 
 type NavigationProp = NativeStackNavigationProp<WatcherStackParamList>;
 
-// 设计稿颜色提取
 const COLORS = {
-  background: '#F5F5F9',     // 页面背景色
-  white: '#FFFFFF',          // 卡片背景
-  black: '#000000',          // 标题文字
-  green: '#8FC31F',          // 主绿色（按钮、选中状态）
-  grayIcon: '#363C44',       // 三角形图标
-  statusRed: '#D20706',      // 状态红点
-  statusGray: '#8E959F',     // 离线状态文字
-  cardTitle: '#636A74',      // 卡片标题
-  iconBg: '#F0F0F0',         // 图标底座背景
+  background: '#F5F5F9',
+  white: '#FFFFFF',
+  black: '#000000',
+  green: '#8FC31F',
+  grayIcon: '#363C44',
+  statusRed: '#D20706',
+  statusGray: '#8E959F',
+  cardTitle: '#BABFC4',
+  activeCardTitle: '#000000',
 };
 
-/**
- * Watcher 首页
- * 完全还原 Pencil 设计稿 (Node ID: jbWD1)
- */
 export const WatcherPage: React.FC = () => {
   const insets = useSafeAreaInsets();
+  const {width: windowWidth, height: windowHeight} = useWindowDimensions();
   const navigation = useNavigation<NavigationProp>();
   const [isConnected, setIsConnected] = useState(false);
 
+  const widthScale = Math.min(Math.max(windowWidth / 393, 0.92), 1.12);
+  const heightScale = Math.min(Math.max(windowHeight / 852, 0.88), 1.1);
+  const scaleValue = (value: number, min?: number, max?: number) => {
+    const scaled = value * widthScale;
+    if (typeof min === 'number' && scaled < min) {
+      return min;
+    }
+    if (typeof max === 'number' && scaled > max) {
+      return max;
+    }
+    return scaled;
+  };
+
+  const verticalScaleValue = (value: number, min?: number, max?: number) => {
+    const scaled = value * heightScale;
+    if (typeof min === 'number' && scaled < min) {
+      return min;
+    }
+    if (typeof max === 'number' && scaled > max) {
+      return max;
+    }
+    return scaled;
+  };
+
+  const horizontalPadding = scaleValue(20, 18, 24);
+  const contentWidth = windowWidth - horizontalPadding * 2;
+  const heroWidth = Math.min(contentWidth, scaleValue(333, 308, 352));
+  const gridGap = scaleValue(16, 14, 18);
+  const cardWidth = (contentWidth - gridGap) / 2;
+  const robotSize = Math.min(heroWidth * (196 / 333), scaleValue(196, 176, 210));
+  const headerBottom = verticalScaleValue(30, 22, 34);
+  const deviceGap = verticalScaleValue(16, 14, 18);
+  const deviceBottom = verticalScaleValue(20, 16, 24);
+  const buttonBottom = verticalScaleValue(32, 24, 38);
+  const cardHeight = verticalScaleValue(116, 108, 122);
+  const sectionTopPadding = verticalScaleValue(10, 8, 14);
+
   const cards = [
-    { id: 'DANCE', title: 'DANCE', icon: DanceIcon },
-    { id: 'MOTION', title: 'MOTION', icon: MotionIcon },
-    { id: 'SURVEILLANCE', title: 'SURVEILLANCE', icon: SurveillanceIcon },
-    { id: 'ANIMATION', title: 'ANIMATION', icon: AnimationIcon },
+    {id: 'DANCE', title: 'DANCE', icon: DanceIcon},
+    {id: 'MOTION', title: 'MOTION', icon: MotionIcon},
+    {id: 'SURVEILLANCE', title: 'SURVEILLANCE', icon: SurveillanceIcon},
+    {id: 'ANIMATION', title: 'ANOMATION', icon: AnimationIcon},
   ];
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + 10 }]}>
+    <View style={[styles.container, {paddingTop: insets.top + sectionTopPadding}]}>
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* ===== 自定义 Header 区 ===== */}
-        <View style={styles.header}>
-          {/* 左侧：Watcher 标题 + 三角形图标 */}
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingHorizontal: horizontalPadding,
+            paddingBottom: insets.bottom + verticalScaleValue(94, 84, 104),
+          },
+        ]}
+        showsVerticalScrollIndicator={false}>
+        <View style={[styles.header, {marginBottom: headerBottom}]}>
           <View style={styles.headerLeft}>
             <Text style={styles.headerTitle}>
-              Wat<Text style={{ color: '#8FC31F' }}>c</Text>her
+              Wat<Text style={{color: COLORS.green}}>c</Text>her
             </Text>
             <View style={styles.triangleIcon} />
           </View>
 
-          {/* 右侧：通知铃铛图标 */}
-          <TouchableOpacity style={styles.bellButton}>
+          <TouchableOpacity style={styles.bellButton} activeOpacity={0.8}>
             <Svg width={18} height={18} viewBox="0 0 14 16" fill="none">
               <Path
                 d="M6.07725 14.0625L6.075 14.0873C6.07503 14.2473 6.13195 14.4022 6.23561 14.5242C6.33926 14.6462 6.4829 14.7274 6.64087 14.7533L6.75 14.7622C6.84076 14.7623 6.93061 14.7441 7.01416 14.7086C7.09771 14.6731 7.17325 14.6212 7.23627 14.5559C7.29928 14.4906 7.34847 14.4132 7.3809 14.3284C7.41333 14.2436 7.42833 14.1532 7.425 14.0625H8.4375C8.43729 14.4959 8.27035 14.9125 7.97129 15.2262C7.67223 15.5398 7.26396 15.7264 6.8311 15.7472C6.39823 15.768 5.97394 15.6215 5.64615 15.3381C5.31836 15.0546 5.11219 14.6558 5.07037 14.2245L5.0625 14.0625H6.07725ZM7.335 0V1.15538C8.71804 1.3 9.99849 1.95178 10.9292 2.98495C11.86 4.01812 12.375 5.35942 12.375 6.75V12.3739L13.5 12.375V13.5L12.375 13.4989V13.5H1.125V13.4989L0 13.5V12.375L1.125 12.3739V6.75C1.1249 5.35606 1.64238 4.01173 2.57711 2.97763C3.51185 1.94354 4.79725 1.29336 6.18413 1.15313L6.18525 0H7.335ZM6.75 2.25C5.55653 2.25 4.41193 2.72411 3.56802 3.56802C2.72411 4.41193 2.25 5.55653 2.25 6.75V12.3739H11.25V6.75C11.25 5.55653 10.7759 4.41193 9.93198 3.56802C9.08807 2.72411 7.94347 2.25 6.75 2.25Z"
@@ -74,53 +114,76 @@ export const WatcherPage: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        {/* ===== 设备展示与状态区 ===== */}
-        <View style={styles.deviceSection}>
-          {/* 机器人图片 - 使用真实产品图 */}
+        <View
+          style={[
+            styles.heroSection,
+            styles.deviceSection,
+            {width: heroWidth, gap: deviceGap, marginBottom: deviceBottom},
+          ]}>
           <Image
             source={require('../../assets/images/robot_watcher.png')}
-            style={styles.deviceImage}
+            style={[styles.deviceImage, {width: robotSize, height: robotSize}]}
             resizeMode="contain"
           />
 
-          {/* 状态行：根据连接状态显示 */}
           <View style={styles.statusRow}>
-            <View style={[styles.statusDot, { backgroundColor: isConnected ? '#8FC31F' : '#D20706' }]} />
-            <Text style={styles.statusText}>{isConnected ? 'Online' : 'Device Offline'}</Text>
+            <View
+              style={[
+                styles.statusDot,
+                {backgroundColor: isConnected ? COLORS.green : COLORS.statusRed},
+              ]}
+            />
+            <Text style={styles.statusText}>
+              {isConnected ? 'Online' : 'Device Offline'}
+            </Text>
           </View>
         </View>
 
-        {/* ===== 核心按钮：根据连接状态显示不同按钮 ===== */}
-        <View style={styles.buttonContainer}>
+        <View
+          style={[
+            styles.heroSection,
+            styles.buttonContainer,
+            {width: heroWidth, marginBottom: buttonBottom},
+          ]}>
           <TouchableOpacity
-            style={[styles.connectButton, isConnected && styles.connectButtonDisabled]}
+            style={[
+              styles.connectButton,
+              isConnected && styles.connectButtonDisabled,
+            ]}
             onPress={() => setIsConnected(!isConnected)}
-          >
+            activeOpacity={0.85}>
             <Text style={styles.connectButtonText}>
               {isConnected ? 'Disconnect' : 'Connect the device'}
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* ===== 功能卡片网格 (Grid Cards) ===== */}
-        <View style={styles.gridContainer}>
-          {cards.map((card) => {
+        <View style={[styles.gridContainer, {columnGap: gridGap}]}>
+          {cards.map(card => {
             const IconComponent = card.icon;
             return (
               <TouchableOpacity
                 key={card.id}
-                style={styles.gridCard}
+                style={[styles.gridCard, {width: cardWidth, height: cardHeight}]}
+                activeOpacity={0.85}
                 onPress={() => {
-                  // 根据 card.id 导航到对应页面
                   const routeName: keyof WatcherStackParamList =
-                    card.id === 'DANCE' ? 'Dance' :
-                    card.id === 'MOTION' ? 'Motion' :
-                    card.id === 'SURVEILLANCE' ? 'Surveillance' :
-                    'Animation';
+                    card.id === 'DANCE'
+                      ? 'Dance'
+                      : card.id === 'MOTION'
+                        ? 'Motion'
+                        : card.id === 'SURVEILLANCE'
+                          ? 'Surveillance'
+                          : 'Animation';
                   navigation.navigate(routeName);
-                }}
-              >
-                <Text style={styles.cardTitle}>{card.title}</Text>
+                }}>
+                <Text
+                  style={[
+                    styles.cardTitle,
+                    {color: isConnected ? COLORS.activeCardTitle : COLORS.cardTitle},
+                  ]}>
+                  {card.title}
+                </Text>
                 <View style={styles.cardIconBg}>
                   <IconComponent
                     size={26}
@@ -137,41 +200,28 @@ export const WatcherPage: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  // ===== 最外层容器 =====
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
   },
-
-  // ===== ScrollView 样式 =====
   scrollView: {
     flex: 1,
   },
-
-  // 【关键】防止底部内容被悬浮导航栏遮挡
   scrollContent: {
-    paddingBottom: 120,
-    paddingHorizontal: 20,
+    alignItems: 'center',
   },
-
-  // ===== Header 区 =====
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     height: 44,
-    marginBottom: 32,
+    width: '100%',
   },
-
-  // Header 左侧容器
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-
-  // "Watcher" 标题
-  // 设计稿：fontFamily: Inter, fontSize: 24, fontWeight: 700
   headerTitle: {
     fontFamily: 'Inter',
     fontSize: 24,
@@ -179,9 +229,6 @@ const styles = StyleSheet.create({
     color: COLORS.black,
     letterSpacing: -0.3,
   },
-
-  // 三角形图标
-  // 设计稿：#363c44, 12x12, polygon rotation -90
   triangleIcon: {
     width: 0,
     height: 0,
@@ -191,81 +238,55 @@ const styles = StyleSheet.create({
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
     borderTopColor: COLORS.grayIcon,
-    transform: [{ rotate: '-90deg' }],
+    transform: [{rotate: '-90deg'}],
   },
-
-  // 铃铛按钮
   bellButton: {
     width: 44,
     height: 44,
     justifyContent: 'center',
     alignItems: 'center',
   },
-
-  // ===== 设备展示区 =====
-  deviceSection: {
-    alignItems: 'center',
-    gap: 16,
-    marginBottom: 20,
-  },
-
-  // 机器人图片 - 按照 Node ID: uLuHB 设计稿
-  // height: 196, width: fill_container
-  deviceImage: {
-    width: '100%',
-    height: 196,
+  heroSection: {
     alignSelf: 'center',
   },
-
-  // 状态行
+  deviceSection: {
+    alignItems: 'center',
+  },
+  deviceImage: {
+    alignSelf: 'center',
+  },
   statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
   },
-
-  // 状态圆点 - 颜色根据连接状态动态设置
   statusDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
   },
-
-  // 状态文字
-  // 设计稿：fontFamily: Inter, fontSize: 14, color: #8e959f
   statusText: {
     fontFamily: 'Inter',
     fontSize: 14,
     fontWeight: '400',
     color: COLORS.statusGray,
   },
-
-  // ===== Connect 按钮容器 =====
   buttonContainer: {
-    marginHorizontal: -10,  // 向外扩展 10px
-    paddingHorizontal: 20,  // 实际边距 = 20(父) - 10(扩展) + 20(自己) = 30px
-    marginBottom: 30,
+    alignSelf: 'center',
   },
-
-  // ===== Connect 按钮 =====
   connectButton: {
-    display: 'flex',
-    width: '100%',  // 自适应屏幕宽度
+    width: '100%',
     paddingVertical: 18,
     paddingHorizontal: 38,
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 30,
-    backgroundColor: '#8FC31F',
+    backgroundColor: COLORS.green,
   },
-
-  // 已连接状态的按钮样式 - 按照设计稿 Node ID: yy2kD
   connectButtonDisabled: {
     backgroundColor: '#E1E1E7',
   },
-
-  // 按钮文字 - 按照设计稿 Node ID: kBpN3
   connectButtonText: {
     fontFamily: 'Inter',
     fontSize: 16,
@@ -274,31 +295,18 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     textAlign: 'center',
   },
-
-  // ===== 功能卡片网格 =====
-  // 按照设计稿：rowGap: 12
   gridContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    rowGap: 12,
+    rowGap: 16,
+    width: '100%',
   },
-
-  // 网格卡片
   gridCard: {
-    width: '47%',
     height: 116,
     backgroundColor: COLORS.white,
     borderRadius: 12,
     padding: 16,
   },
-
-  // 按下状态卡片（交互反馈）
-  gridCardPressed: {
-    opacity: 0.9,
-  },
-
-  // 卡片图标底座 - 按照设计稿规格
   cardIconBg: {
     position: 'absolute',
     bottom: 16,
@@ -310,13 +318,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-
-  // 卡片标题 - 按照设计稿规格
   cardTitle: {
     fontFamily: 'Inter',
     fontSize: 16,
     fontWeight: '700',
-    color: '#636A74',
+    color: COLORS.cardTitle,
     lineHeight: 16,
   },
 });
