@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
@@ -20,8 +21,6 @@ const COLORS = {
   green: '#8FC31F',
   thumbBorder: '#0F0F10',
 };
-
-const THUMBNAIL_SIZE = 54;
 
 type ThumbnailItem =
   | {type: 'image'; uri: string}
@@ -183,7 +182,41 @@ const GroupCard: React.FC<{title: string; items: ThumbnailItem[]}> = ({
  */
 export const AnimationPage: React.FC = () => {
   const insets = useSafeAreaInsets();
+  const {width: windowWidth, height: windowHeight} = useWindowDimensions();
   const navigation = useNavigation();
+  const widthScale = Math.min(Math.max(windowWidth / 393, 0.92), 1.12);
+  const heightScale = Math.min(Math.max(windowHeight / 852, 0.88), 1.1);
+  const scaleValue = (value: number, min?: number, max?: number) => {
+    const scaled = value * widthScale;
+    if (typeof min === 'number' && scaled < min) {
+      return min;
+    }
+    if (typeof max === 'number' && scaled > max) {
+      return max;
+    }
+    return scaled;
+  };
+  const verticalScaleValue = (value: number, min?: number, max?: number) => {
+    const scaled = value * heightScale;
+    if (typeof min === 'number' && scaled < min) {
+      return min;
+    }
+    if (typeof max === 'number' && scaled > max) {
+      return max;
+    }
+    return scaled;
+  };
+  const horizontalPadding = scaleValue(20, 18, 24);
+  const headerSideInset = scaleValue(30, 26, 32);
+  const topPadding = verticalScaleValue(24, 20, 28);
+  const cardGap = verticalScaleValue(16, 14, 18);
+  const descriptionWidth = windowWidth - horizontalPadding * 2 - scaleValue(16, 12, 16);
+  const contentWidth = windowWidth - horizontalPadding * 2;
+  const thumbSize = Math.min(scaleValue(54, 48, 58), (contentWidth - 32 - 52) / 5);
+  const overlayTop = Math.round(thumbSize * (17 / 54));
+  const overlayLeft = Math.round(thumbSize * (8 / 54));
+  const overlayWidth = Math.round(thumbSize * (39 / 54));
+  const overlayHeight = Math.round(thumbSize * (19 / 54));
 
   return (
     <View style={styles.container}>
@@ -191,7 +224,7 @@ export const AnimationPage: React.FC = () => {
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <TouchableOpacity
-            style={styles.headerButton}
+            style={[styles.headerButton, {left: headerSideInset}]}
             onPress={() => navigation.goBack()}
             activeOpacity={0.8}>
             <BackIcon />
@@ -204,16 +237,98 @@ export const AnimationPage: React.FC = () => {
         style={styles.scrollView}
         contentContainerStyle={[
           styles.scrollContent,
-          {paddingBottom: insets.bottom + 24},
+          {
+            paddingHorizontal: horizontalPadding,
+            paddingTop: topPadding,
+            paddingBottom: insets.bottom + verticalScaleValue(24, 20, 30),
+          },
         ]}
         showsVerticalScrollIndicator={false}>
-        <Text style={styles.description}>
+        <Text style={[styles.description, {width: descriptionWidth}]}>
           {`Feel free to upload your prefer faces to create your\nunique watcher! Make sure the images are:\n- PNG format\n- 412x412 px size\nThe frame rate is 500 ms per image, please design\nyour animation accordingly,`}
         </Text>
 
-        <View style={styles.cardList}>
+        <View style={[styles.cardList, {gap: cardGap}]}>
           {GROUPS.map(group => (
-            <GroupCard key={group.title} title={group.title} items={group.items} />
+            <View key={group.title} style={[styles.card, {width: contentWidth}]}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardTitle}>{group.title}</Text>
+                <TouchableOpacity style={styles.playButton} activeOpacity={0.8}>
+                  <PlayIcon />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.thumbnailRow}>
+                {group.items.map((item, index) => {
+                  if (item.type === 'placeholder') {
+                    return (
+                      <View
+                        key={`${group.title}-${index}`}
+                        style={[
+                          styles.placeholder,
+                          {
+                            width: thumbSize,
+                            height: thumbSize,
+                            borderRadius: thumbSize * 0.16,
+                          },
+                        ]}
+                      />
+                    );
+                  }
+
+                  if (item.type === 'composite') {
+                    return (
+                      <View
+                        key={`${group.title}-${index}`}
+                        style={[
+                          styles.thumbnail,
+                          {
+                            width: thumbSize,
+                            height: thumbSize,
+                            borderRadius: thumbSize / 2,
+                          },
+                        ]}>
+                        <Image
+                          source={{uri: item.backgroundUri}}
+                          style={[styles.thumbnailImage, {borderRadius: thumbSize / 2}]}
+                        />
+                        <Image
+                          source={{uri: item.overlayUri}}
+                          style={[
+                            styles.thumbnailOverlay,
+                            {
+                              top: overlayTop,
+                              left: overlayLeft,
+                              width: overlayWidth,
+                              height: overlayHeight,
+                            },
+                          ]}
+                          resizeMode="contain"
+                        />
+                      </View>
+                    );
+                  }
+
+                  return (
+                    <View
+                      key={`${group.title}-${index}`}
+                      style={[
+                        styles.thumbnail,
+                        {
+                          width: thumbSize,
+                          height: thumbSize,
+                          borderRadius: thumbSize / 2,
+                        },
+                      ]}>
+                      <Image
+                        source={{uri: item.uri}}
+                        style={[styles.thumbnailImage, {borderRadius: thumbSize / 2}]}
+                      />
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
           ))}
         </View>
       </ScrollView>
@@ -228,7 +343,6 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: COLORS.white,
-    paddingHorizontal: 30,
     height: 44,
     justifyContent: 'center',
   },
@@ -241,7 +355,6 @@ const styles = StyleSheet.create({
   },
   headerButton: {
     position: 'absolute',
-    left: 0,
     top: 0,
     width: 24,
     height: 24,
@@ -260,8 +373,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 24,
+    alignItems: 'center',
   },
   description: {
     fontFamily: 'Inter',
@@ -304,9 +416,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   thumbnail: {
-    width: THUMBNAIL_SIZE,
-    height: THUMBNAIL_SIZE,
-    borderRadius: THUMBNAIL_SIZE / 2,
     borderWidth: 1,
     borderColor: COLORS.thumbBorder,
     overflow: 'hidden',
@@ -315,19 +424,11 @@ const styles = StyleSheet.create({
   thumbnailImage: {
     width: '100%',
     height: '100%',
-    borderRadius: THUMBNAIL_SIZE / 2,
   },
   thumbnailOverlay: {
     position: 'absolute',
-    top: 17,
-    left: 8,
-    width: 39,
-    height: 19,
   },
   placeholder: {
-    width: THUMBNAIL_SIZE,
-    height: THUMBNAIL_SIZE,
-    borderRadius: 8.64,
     borderWidth: 1,
     borderColor: COLORS.green,
     borderStyle: 'dashed',

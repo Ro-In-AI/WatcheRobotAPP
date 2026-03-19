@@ -1,19 +1,16 @@
 import React from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
   Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Svg, Path, Rect } from 'react-native-svg';
-import { useNavigation } from '@react-navigation/native';
-
-/**
- * Dance 页面
- * 完全还原 Pencil 设计稿 (Node ID: IMnLH)
- */
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {Svg, Path, Rect} from 'react-native-svg';
+import {useNavigation} from '@react-navigation/native';
 
 const COLORS = {
   background: '#F5F5F9',
@@ -29,20 +26,59 @@ const DEFAULT_ROBOTS = ['Watcher-01', 'Watcher-02', 'Watcher-03'] as const;
 
 export const DancePage: React.FC = () => {
   const insets = useSafeAreaInsets();
+  const {width: windowWidth, height: windowHeight} = useWindowDimensions();
   const navigation = useNavigation();
   const [selectedTab, setSelectedTab] = React.useState<TabType>('default');
   const [selectedRobot, setSelectedRobot] = React.useState<string>('Watcher-01');
 
+  const widthScale = Math.min(Math.max(windowWidth / 393, 0.92), 1.12);
+  const heightScale = Math.min(Math.max(windowHeight / 852, 0.88), 1.1);
+  const scaleValue = (value: number, min?: number, max?: number) => {
+    const scaled = value * widthScale;
+    if (typeof min === 'number' && scaled < min) {
+      return min;
+    }
+    if (typeof max === 'number' && scaled > max) {
+      return max;
+    }
+    return scaled;
+  };
+  const verticalScaleValue = (value: number, min?: number, max?: number) => {
+    const scaled = value * heightScale;
+    if (typeof min === 'number' && scaled < min) {
+      return min;
+    }
+    if (typeof max === 'number' && scaled > max) {
+      return max;
+    }
+    return scaled;
+  };
+
+  const horizontalPadding = scaleValue(20, 18, 24);
+  const headerSideInset = scaleValue(30, 26, 32);
+  const contentWidth = windowWidth - horizontalPadding * 2;
+  const tabTop = verticalScaleValue(22, 18, 28);
+  const tabHeight = verticalScaleValue(50, 48, 52);
+  const tabInnerHeight = verticalScaleValue(42, 40, 44);
+  const robotTop = verticalScaleValue(28, 20, 34);
+  const robotBottom = verticalScaleValue(26, 22, 34);
+  const robotSize = Math.min(scaleValue(196, 176, 210), contentWidth * 0.56);
+  const robotLabelTop = verticalScaleValue(16, 14, 18);
+  const bottomCardTopPadding = verticalScaleValue(16, 14, 18);
+  const bottomContentBottom = insets.bottom + verticalScaleValue(16, 12, 22);
+  const itemWidth = Math.floor((contentWidth - 32) / 3);
+  const iconSize = Math.min(scaleValue(85, 76, 88), itemWidth - scaleValue(22, 18, 24));
+  const addButtonSize = Math.min(scaleValue(75, 68, 80), itemWidth);
+
   return (
     <View style={styles.container}>
-      <View style={{ height: insets.top, backgroundColor: COLORS.white }} />
-      {/* ===== Header (Node ID: PPJeF) ===== */}
+      <View style={{height: insets.top, backgroundColor: COLORS.white}} />
+
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <TouchableOpacity
-            style={styles.headerButton}
-            onPress={() => navigation.goBack()}
-          >
+            style={[styles.headerButton, {left: headerSideInset}]}
+            onPress={() => navigation.goBack()}>
             <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
               <Path
                 d="M9.23544 11.9995L17.3905 19.8827C17.8711 20.3481 17.8711 21.1014 17.3905 21.5653C16.9098 22.03 16.13 22.03 15.6494 21.5653L6.62452 12.8406C6.14458 12.376 6.14458 11.6223 6.62452 11.1591L15.6494 2.43481C15.8905 2.20246 16.2055 2.0863 16.5207 2.0863C16.8358 2.0863 17.1509 2.20248 17.3905 2.43555C17.8711 2.90024 17.8711 3.65242 17.3905 4.1171L9.23544 11.9995Z"
@@ -53,7 +89,8 @@ export const DancePage: React.FC = () => {
 
           <Text style={styles.headerTitle}>Dance</Text>
 
-          <TouchableOpacity style={styles.headerRightButton}>
+          <TouchableOpacity
+            style={[styles.headerRightButton, {right: headerSideInset}]}>
             <Svg width={18} height={18} viewBox="0 0 18 18" fill="none">
               <Path
                 d="M9 16.8403C6.8968 16.8403 4.91961 16.0253 3.43236 14.5453C1.94454 13.0643 1.125 11.0955 1.125 9.00021C1.125 6.90545 1.94457 4.93615 3.43182 3.45564C4.91907 1.97571 6.89626 1.16064 8.99946 1.16064C11.1027 1.16064 13.0798 1.97571 14.5665 3.45564C16.0549 4.93615 16.8739 6.90545 16.8739 8.99963C16.8745 11.0949 16.0549 13.0643 14.5665 14.5447C13.0804 16.0247 11.1032 16.8403 9 16.8403ZM9 2.28504C7.19607 2.28504 5.50069 2.98366 4.22608 4.25268C2.952 5.52055 2.25 7.20692 2.25 9.00018C2.25 10.7934 2.95143 12.4798 4.2255 13.7471C5.50012 15.0161 7.19549 15.7147 8.99943 15.7147C10.8028 15.7147 12.4987 15.0161 13.7734 13.7471C15.0474 12.4786 15.7494 10.7929 15.7489 8.9996C15.7489 7.20634 15.0474 5.52055 13.7734 4.25322C12.4993 2.98423 10.8034 2.28504 9 2.28504Z"
@@ -68,79 +105,125 @@ export const DancePage: React.FC = () => {
         </View>
       </View>
 
-      {/* ===== 时间按钮栏 (Node ID: VRAF8) ===== */}
-      <View style={styles.timeBar}>
+      <View
+        style={[
+          styles.timeBar,
+          {
+            marginHorizontal: horizontalPadding,
+            marginTop: tabTop,
+            height: tabHeight,
+          },
+        ]}>
         <TouchableOpacity
-          style={[styles.discoverButton, selectedTab === 'default' && styles.buttonActive]}
-          onPress={() => setSelectedTab('default')}
-        >
-          <Text style={[styles.discoverButtonText, selectedTab === 'default' && styles.textActive]}>
+          style={[
+            styles.tabButton,
+            {height: tabInnerHeight},
+            selectedTab === 'default' && styles.buttonActive,
+          ]}
+          onPress={() => setSelectedTab('default')}>
+          <Text
+            style={[
+              styles.tabButtonText,
+              selectedTab === 'default' && styles.textActive,
+            ]}>
             Default
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.customButton, selectedTab === 'customization' && styles.buttonActive]}
-          onPress={() => setSelectedTab('customization')}
-        >
-          <Text style={[styles.customButtonText, selectedTab === 'customization' && styles.textActive]}>
+          style={[
+            styles.tabButton,
+            {height: tabInnerHeight},
+            selectedTab === 'customization' && styles.buttonActive,
+          ]}
+          onPress={() => setSelectedTab('customization')}>
+          <Text
+            style={[
+              styles.tabButtonText,
+              selectedTab === 'customization' && styles.textActive,
+            ]}>
             Customization
           </Text>
         </TouchableOpacity>
       </View>
 
-      {/* ===== 机器人展示区 ===== */}
-      <View style={styles.robotSection}>
+      <View
+        style={[
+          styles.robotSection,
+          {
+            width: contentWidth,
+            marginTop: robotTop,
+            marginBottom: robotBottom,
+          },
+        ]}>
         <Image
           source={require('../../assets/images/robot_watcher.png')}
-          style={styles.robotImage}
+          style={[styles.robotImage, {width: robotSize, height: robotSize}]}
           resizeMode="contain"
         />
-        <Text style={styles.robotLabel}>Watcher-01</Text>
+        <Text style={[styles.robotLabel, {marginTop: robotLabelTop}]}>
+          Watcher-01
+        </Text>
       </View>
 
-      {/* ===== 底部白色卡片 ===== */}
-      {selectedTab === 'default' ? (
-        // Default tab: Node ID: oQww2
-        <View style={styles.bottomCardDefault}>
-          <Text style={styles.otherTitle}>Other</Text>
+      <View
+        style={[
+          styles.bottomCard,
+          {
+            marginHorizontal: horizontalPadding,
+            paddingTop: bottomCardTopPadding,
+          },
+        ]}>
+        <Text style={styles.otherTitle}>Other</Text>
 
-          <View style={styles.iconGrid}>
-            {DEFAULT_ROBOTS.map((robotName) => (
+        {selectedTab === 'default' ? (
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={[
+              styles.iconGrid,
+              {paddingBottom: bottomContentBottom},
+            ]}>
+            {DEFAULT_ROBOTS.map(robotName => (
               <TouchableOpacity
                 key={robotName}
-                style={[styles.iconItem, selectedRobot === robotName && styles.iconItemActive]}
-                onPress={() => setSelectedRobot(robotName)}
-              >
+                style={[
+                  styles.iconItem,
+                  {width: itemWidth},
+                  selectedRobot === robotName && styles.iconItemActive,
+                ]}
+                onPress={() => setSelectedRobot(robotName)}>
                 <Image
                   source={require('../../assets/images/robot_watcher.png')}
-                  style={styles.iconImage}
+                  style={[styles.iconImage, {width: iconSize, height: iconSize}]}
                   resizeMode="contain"
                 />
                 <Text style={styles.iconLabel}>{robotName}</Text>
               </TouchableOpacity>
             ))}
-          </View>
-        </View>
-      ) : (
-        // Customization tab: Node ID: eH657
-        <View style={styles.bottomCardCustom}>
-          <Text style={styles.otherTitle}>Other</Text>
-
-          <View style={styles.iconGrid}>
-            {/* 机器人卡片 */}
-            <View style={styles.customIconItem}>
+          </ScrollView>
+        ) : (
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={[
+              styles.iconGrid,
+              {paddingBottom: bottomContentBottom},
+            ]}>
+            <View style={[styles.customIconItem, {width: itemWidth}]}>
               <Image
                 source={require('../../assets/images/robot_watcher.png')}
-                style={styles.iconImage}
+                style={[styles.iconImage, {width: iconSize, height: iconSize}]}
                 resizeMode="contain"
               />
               <Text style={styles.iconLabel}>Watcher-04</Text>
             </View>
 
-            {/* 绿色添加按钮 */}
-            <TouchableOpacity style={styles.addButton}>
-              <Svg width={75} height={75} viewBox="0 0 75 75" fill="none">
+            <TouchableOpacity
+              style={[styles.addButton, {width: itemWidth, height: itemWidth}]}>
+              <Svg
+                width={addButtonSize}
+                height={addButtonSize}
+                viewBox="0 0 75 75"
+                fill="none">
                 <Rect
                   x="1"
                   y="1"
@@ -166,11 +249,10 @@ export const DancePage: React.FC = () => {
               </Svg>
             </TouchableOpacity>
 
-            {/* 空占位 */}
-            <View style={styles.emptySlot} />
-          </View>
-        </View>
-      )}
+            <View style={[styles.emptySlot, {width: itemWidth}]} />
+          </ScrollView>
+        )}
+      </View>
     </View>
   );
 };
@@ -180,15 +262,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-
-  // Header
   header: {
     height: 44,
-    paddingHorizontal: 30,
     backgroundColor: COLORS.white,
     justifyContent: 'center',
   },
-
   headerContent: {
     width: '100%',
     height: 24,
@@ -196,7 +274,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'relative',
   },
-
   headerButton: {
     position: 'absolute',
     left: 0,
@@ -206,7 +283,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-
   headerRightButton: {
     position: 'absolute',
     right: 0,
@@ -216,7 +292,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-
   headerTitle: {
     fontFamily: 'SF Pro',
     fontSize: 18,
@@ -225,106 +300,48 @@ const styles = StyleSheet.create({
     color: '#1A1A1A',
     textAlign: 'center',
   },
-
-  // 机器人展示区
+  timeBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.lightGray,
+    borderRadius: 30,
+    padding: 4,
+  },
+  tabButton: {
+    flex: 1,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tabButtonText: {
+    fontFamily: 'Inter',
+    fontSize: 14,
+    fontWeight: '400',
+    color: COLORS.gray,
+    textAlign: 'center',
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+  },
   robotSection: {
     alignItems: 'center',
-    paddingVertical: 20,
+    alignSelf: 'center',
   },
-
   robotImage: {
-    width: 173,
-    height: 182,
+    alignSelf: 'center',
   },
-
   robotLabel: {
     fontFamily: 'SF Pro',
     fontSize: 18,
     fontWeight: '500',
     color: COLORS.black,
-    marginTop: 16,
   },
-
-  // 时间按钮栏 (Node ID: VRAF8)
-  timeBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    height: 50,
-    marginHorizontal: 20,
-    marginTop: 22,
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 30,
-    padding: 4,
-  },
-
-  // Default 按钮 (Node ID: MI2jE) - 默认非激活状态
-  discoverButton: {
-    flex: 0.49,
-    height: 42,
-    backgroundColor: 'transparent',
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  // "Default" 文字 (Node ID: VVQCJ) - 默认非激活状态
-  discoverButtonText: {
-    fontFamily: 'Inter',
-    fontSize: 14,
-    fontWeight: '400',
-    color: '#636A74',
-    textAlign: 'center',
-    includeFontPadding: false,
-    textAlignVertical: 'center',
-  },
-
-  // Customization 按钮 (Node ID: Spb4H)
-  customButton: {
-    flex: 0.49,
-    height: 42,
-    backgroundColor: 'transparent',
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  // "Customization" 文字 (Node ID: LJ2Fb)
-  customButtonText: {
-    fontFamily: 'Inter',
-    fontSize: 14,
-    fontWeight: '400',
-    color: '#636A74',
-    textAlign: 'center',
-    includeFontPadding: false,
-    textAlignVertical: 'center',
-  },
-
-  // 底部白色卡片 - Default tab (Node ID: oQww2)
-  bottomCardDefault: {
+  bottomCard: {
     flex: 1,
     backgroundColor: COLORS.white,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 20 + 34,
-    marginLeft: 20,
-    marginRight: 20,
   },
-
-  // 底部白色卡片 - Customization tab (Node ID: eH657)
-  bottomCardCustom: {
-    flex: 1,
-    backgroundColor: COLORS.white,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 20 + 34,
-    marginLeft: 20,
-    marginRight: 20,
-  },
-
   otherTitle: {
     fontFamily: 'Inter',
     fontSize: 14,
@@ -332,87 +349,56 @@ const styles = StyleSheet.create({
     color: COLORS.black,
     marginBottom: 16,
   },
-
   iconGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 16,
+    flexWrap: 'wrap',
+    alignItems: 'flex-start',
   },
-
   iconItem: {
-    flex: 1,
-    backgroundColor: 'transparent',
     borderRadius: 12,
     paddingVertical: 12,
-    paddingHorizontal: 13,
+    paddingHorizontal: 11,
     alignItems: 'center',
     gap: 12,
-    maxWidth: 107,
   },
-
   iconItemActive: {
     backgroundColor: '#F3F5F8',
   },
-
-  // Customization tab 机器人卡片 (无选中功能)
   customIconItem: {
-    flex: 1,
-    backgroundColor: 'transparent',
     borderRadius: 12,
     paddingVertical: 12,
-    paddingHorizontal: 13,
+    paddingHorizontal: 11,
     alignItems: 'center',
     gap: 12,
-    maxWidth: 107,
   },
-
-  // 空占位
   emptySlot: {
-    flex: 1,
+    height: 1,
   },
-
   iconImage: {
-    width: '100%',
-    height: 85,
+    alignSelf: 'center',
   },
-
   iconLabel: {
     fontFamily: 'Inter',
     fontSize: 14,
-    fontWeight: 'normal',
+    fontWeight: '400',
     color: COLORS.black,
     textAlign: 'center',
   },
-
-  // 激活状态的按钮样式
   buttonActive: {
     backgroundColor: COLORS.white,
     shadowColor: '#0000001a',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: {width: 0, height: 1},
     shadowOpacity: 1,
     shadowRadius: 7.35,
     elevation: 2,
   },
-
-  // 激活状态的文字样式
   textActive: {
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#0D0D0D',
   },
-
-  // 绿色添加按钮 (Node ID: 8zHRP)
   addButton: {
-    flex: 1,
-    backgroundColor: 'transparent',
     borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 13,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
-    maxWidth: 107,
   },
-
 });
-
-

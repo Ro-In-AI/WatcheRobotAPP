@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
@@ -77,9 +78,7 @@ const DANCE_ITEMS = [
   },
 ];
 
-const JOYSTICK_CENTER = 92.5;
 const JOYSTICK_RADIUS = 30;
-const JOYSTICK_MAX_DISTANCE = 28;
 type MotionNavigationProp = NativeStackNavigationProp<WatcherStackParamList>;
 
 const BackIcon: React.FC = () => (
@@ -119,10 +118,52 @@ const Arrow: React.FC<{direction: 'up' | 'right' | 'down' | 'left'}> = ({directi
 
 export const MotionPage: React.FC = () => {
   const insets = useSafeAreaInsets();
+  const {width: windowWidth, height: windowHeight} = useWindowDimensions();
   const navigation = useNavigation<MotionNavigationProp>();
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
   const [joystickOffset, setJoystickOffset] = useState({x: 0, y: 0});
   const panStartRef = useRef({x: 0, y: 0});
+
+  const widthScale = Math.min(Math.max(windowWidth / 393, 0.92), 1.12);
+  const heightScale = Math.min(Math.max(windowHeight / 852, 0.88), 1.1);
+  const scaleValue = (value: number, min?: number, max?: number) => {
+    const scaled = value * widthScale;
+    if (typeof min === 'number' && scaled < min) {
+      return min;
+    }
+    if (typeof max === 'number' && scaled > max) {
+      return max;
+    }
+    return scaled;
+  };
+  const verticalScaleValue = (value: number, min?: number, max?: number) => {
+    const scaled = value * heightScale;
+    if (typeof min === 'number' && scaled < min) {
+      return min;
+    }
+    if (typeof max === 'number' && scaled > max) {
+      return max;
+    }
+    return scaled;
+  };
+
+  const horizontalPadding = scaleValue(20, 18, 24);
+  const headerSideInset = scaleValue(30, 26, 32);
+  const contentWidth = windowWidth - horizontalPadding * 2;
+  const robotTop = verticalScaleValue(24, 20, 28);
+  const robotBottom = verticalScaleValue(17, 14, 22);
+  const robotWidth = Math.min(scaleValue(171, 158, 182), contentWidth * 0.52);
+  const robotHeight = Math.min(scaleValue(196, 182, 210), contentWidth * 0.6);
+  const cardTopPadding = verticalScaleValue(20, 18, 24);
+  const joystickTop = verticalScaleValue(24, 20, 28);
+  const joystickBottom = verticalScaleValue(18, 14, 22);
+  const joystickShellSize = Math.min(scaleValue(185, 170, 194), contentWidth * 0.56);
+  const joystickCenter = joystickShellSize / 2;
+  const joystickMaxDistance = joystickShellSize * (28 / 185);
+  const danceTop = verticalScaleValue(16, 14, 18);
+  const gridBottomPadding = insets.bottom + verticalScaleValue(16, 12, 22);
+  const gridItemWidth = Math.floor((contentWidth - 32) / 3);
+  const gridImageSize = Math.min(scaleValue(85, 76, 88), gridItemWidth - scaleValue(22, 18, 24));
 
   const panResponder = useRef(
     PanResponder.create({
@@ -136,15 +177,15 @@ export const MotionPage: React.FC = () => {
         const nextY = panStartRef.current.y + gestureState.dy;
         const distance = Math.sqrt(nextX * nextX + nextY * nextY);
 
-        if (distance <= JOYSTICK_MAX_DISTANCE) {
+        if (distance <= joystickMaxDistance) {
           setJoystickOffset({x: nextX, y: nextY});
           return;
         }
 
         const angle = Math.atan2(nextY, nextX);
         setJoystickOffset({
-          x: Math.cos(angle) * JOYSTICK_MAX_DISTANCE,
-          y: Math.sin(angle) * JOYSTICK_MAX_DISTANCE,
+          x: Math.cos(angle) * joystickMaxDistance,
+          y: Math.sin(angle) * joystickMaxDistance,
         });
       },
       onPanResponderRelease: () => {
@@ -163,7 +204,7 @@ export const MotionPage: React.FC = () => {
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <TouchableOpacity
-            style={styles.headerButton}
+            style={[styles.headerButton, {left: headerSideInset}]}
             onPress={() => navigation.goBack()}
             activeOpacity={0.8}>
             <BackIcon />
@@ -173,16 +214,39 @@ export const MotionPage: React.FC = () => {
       </View>
 
       <View style={styles.content}>
-        <View style={styles.robotSection}>
-          <Image source={{uri: ROBOT_IMAGE}} style={styles.robotImage} resizeMode="contain" />
+        <View
+          style={[
+            styles.robotSection,
+            {
+              width: contentWidth,
+              marginTop: robotTop,
+              marginBottom: robotBottom,
+            },
+          ]}>
+          <Image
+            source={{uri: ROBOT_IMAGE}}
+            style={[styles.robotImage, {width: robotWidth, height: robotHeight}]}
+            resizeMode="contain"
+          />
         </View>
 
-        <View style={styles.card}>
+        <View
+          style={[
+            styles.card,
+            {
+              width: contentWidth,
+              paddingTop: cardTopPadding,
+            },
+          ]}>
           <Text style={styles.sectionTitle}>Joystick</Text>
 
-          <View style={styles.joystickSection}>
+          <View
+            style={[
+              styles.joystickSection,
+              {paddingTop: joystickTop, paddingBottom: joystickBottom},
+            ]}>
             <View
-              style={styles.joystickShell}
+              style={[styles.joystickShell, {width: joystickShellSize, height: joystickShellSize, borderRadius: joystickCenter}]}
               collapsable={false}
               {...panResponder.panHandlers}>
               <Arrow direction="up" />
@@ -194,8 +258,8 @@ export const MotionPage: React.FC = () => {
                 style={[
                   styles.joystickKnobOuter,
                   {
-                    left: JOYSTICK_CENTER - JOYSTICK_RADIUS + joystickOffset.x,
-                    top: JOYSTICK_CENTER - JOYSTICK_RADIUS + joystickOffset.y,
+                    left: joystickCenter - JOYSTICK_RADIUS + joystickOffset.x,
+                    top: joystickCenter - JOYSTICK_RADIUS + joystickOffset.y,
                   },
                 ]}>
                 <Svg width={60} height={60} viewBox="0 0 60 60" fill="none">
@@ -215,19 +279,27 @@ export const MotionPage: React.FC = () => {
           <View style={styles.divider} />
 
           <View style={styles.danceSection}>
-            <Text style={styles.danceTitle}>Dance</Text>
+            <Text style={[styles.danceTitle, {marginBottom: danceTop}]}>Dance</Text>
 
             <ScrollView
               style={styles.danceScroll}
-              contentContainerStyle={[styles.grid, {paddingBottom: insets.bottom + 16}]}
+              contentContainerStyle={[styles.grid, {paddingBottom: gridBottomPadding}]}
               showsVerticalScrollIndicator={false}>
               {DANCE_ITEMS.map(item => (
                 <TouchableOpacity
                   key={item.id}
-                  style={[styles.gridItem, selectedItem === item.id && styles.gridItemActive]}
+                  style={[
+                    styles.gridItem,
+                    {width: gridItemWidth},
+                    selectedItem === item.id && styles.gridItemActive,
+                  ]}
                   activeOpacity={0.85}
                   onPress={() => setSelectedItem(current => (current === item.id ? null : item.id))}>
-                  <Image source={{uri: item.image}} style={styles.gridImage} resizeMode="contain" />
+                  <Image
+                    source={{uri: item.image}}
+                    style={[styles.gridImage, {width: gridImageSize, height: gridImageSize}]}
+                    resizeMode="contain"
+                  />
                   <Text style={styles.gridLabel} numberOfLines={1}>
                     {item.title}
                   </Text>
@@ -249,7 +321,6 @@ const styles = StyleSheet.create({
   header: {
     height: 44,
     backgroundColor: COLORS.background,
-    paddingHorizontal: 30,
     justifyContent: 'center',
   },
   headerContent: {
@@ -261,7 +332,6 @@ const styles = StyleSheet.create({
   },
   headerButton: {
     position: 'absolute',
-    left: 0,
     top: 0,
     width: 24,
     height: 24,
@@ -278,16 +348,13 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 20,
+    alignItems: 'center',
   },
   robotSection: {
     alignItems: 'center',
-    paddingTop: 24,
-    paddingBottom: 17,
   },
   robotImage: {
-    width: 171,
-    height: 196,
+    alignSelf: 'center',
   },
   card: {
     flex: 1,
@@ -295,7 +362,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     paddingHorizontal: 16,
-    paddingTop: 20,
   },
   sectionTitle: {
     fontFamily: 'Inter',
@@ -306,13 +372,8 @@ const styles = StyleSheet.create({
   },
   joystickSection: {
     alignItems: 'center',
-    paddingTop: 24,
-    paddingBottom: 18,
   },
   joystickShell: {
-    width: 185,
-    height: 185,
-    borderRadius: 92.5,
     backgroundColor: COLORS.white,
     position: 'relative',
     shadowColor: '#CFCFD7',
@@ -329,20 +390,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   arrowUp: {
-    top: 19,
-    left: 80.5,
+    top: '10.27027%',
+    left: '43.51351%',
   },
   arrowRight: {
-    right: 19,
-    top: 80.5,
+    right: '10.27027%',
+    top: '43.51351%',
   },
   arrowDown: {
-    bottom: 19,
-    left: 80.5,
+    bottom: '10.27027%',
+    left: '43.51351%',
   },
   arrowLeft: {
-    left: 19,
-    top: 80.5,
+    left: '10.27027%',
+    top: '43.51351%',
   },
   joystickKnobOuter: {
     position: 'absolute',
@@ -378,8 +439,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   gridItem: {
-    width: '33.3333%',
-    paddingHorizontal: 6,
+    paddingHorizontal: 11,
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
@@ -388,8 +448,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F5F8',
   },
   gridImage: {
-    width: 85,
-    height: 85,
     marginBottom: 12,
   },
   gridLabel: {

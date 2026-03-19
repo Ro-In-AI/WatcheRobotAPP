@@ -11,6 +11,7 @@ import {
   Text,
   TouchableOpacity,
   UIManager,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
@@ -163,23 +164,30 @@ const Arrow: React.FC<{
   );
 };
 
-const JoystickPad: React.FC<{compact?: boolean; compactScale?: number}> = ({
+const JoystickPad: React.FC<{
+  compact?: boolean;
+  compactScale?: number;
+  shellSize: number;
+}> = ({
   compact = false,
   compactScale = 1,
+  shellSize,
 }) => {
-  const compactShellSize = Math.round(150 * compactScale);
-  const compactRadius = Math.round(compactShellSize / 2);
-  const compactCenterSize = Math.round(64 * compactScale);
-  const compactCenterRadius = Math.round(compactCenterSize / 2);
+  const currentShellSize = compact
+    ? Math.round(150 * compactScale)
+    : shellSize;
+  const currentRadius = Math.round(currentShellSize / 2);
+  const currentCenterSize = Math.round(currentShellSize * (104 / 250));
+  const currentCenterRadius = Math.round(currentCenterSize / 2);
 
   return (
     <View
       style={[
         styles.joystickShell,
-        compact && {
-          width: compactShellSize,
-          height: compactShellSize,
-          borderRadius: compactRadius,
+        {
+          width: currentShellSize,
+          height: currentShellSize,
+          borderRadius: currentRadius,
         },
       ]}>
       <Arrow direction="up" compact={compact} compactScale={compactScale} />
@@ -190,10 +198,10 @@ const JoystickPad: React.FC<{compact?: boolean; compactScale?: number}> = ({
       <View
         style={[
           styles.centerOuterCircle,
-          compact && {
-            width: compactCenterSize,
-            height: compactCenterSize,
-            borderRadius: compactCenterRadius,
+          {
+            width: currentCenterSize,
+            height: currentCenterSize,
+            borderRadius: currentCenterRadius,
           },
         ]}
       />
@@ -203,26 +211,57 @@ const JoystickPad: React.FC<{compact?: boolean; compactScale?: number}> = ({
 
 export const SurveillancePage: React.FC = () => {
   const insets = useSafeAreaInsets();
+  const {width: windowWidth, height: windowHeight} = useWindowDimensions();
   const navigation = useNavigation();
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [joystickOffset, setJoystickOffset] = useState({x: 0, y: 0});
   const [bottomAreaHeight, setBottomAreaHeight] = useState(FIGMA_BOTTOM_AREA_HEIGHT);
   const panStartRef = useRef({x: 0, y: 0});
+  const widthScale = Math.min(Math.max(windowWidth / 393, 0.92), 1.12);
+  const heightScale = Math.min(Math.max(windowHeight / 852, 0.88), 1.1);
+  const scaleValue = (value: number, min?: number, max?: number) => {
+    const scaled = value * widthScale;
+    if (typeof min === 'number' && scaled < min) {
+      return min;
+    }
+    if (typeof max === 'number' && scaled > max) {
+      return max;
+    }
+    return scaled;
+  };
+  const verticalScaleValue = (value: number, min?: number, max?: number) => {
+    const scaled = value * heightScale;
+    if (typeof min === 'number' && scaled < min) {
+      return min;
+    }
+    if (typeof max === 'number' && scaled > max) {
+      return max;
+    }
+    return scaled;
+  };
+  const headerSideInset = scaleValue(30, 26, 32);
+  const horizontalPadding = scaleValue(20, 18, 24);
+  const cameraHeight = verticalScaleValue(273, 248, 292);
+  const closedJoystickSize = Math.min(scaleValue(250, 224, 268), windowWidth * 0.64);
   const bottomAreaScale = Math.min(
-    Math.max(bottomAreaHeight / FIGMA_BOTTOM_AREA_HEIGHT, 0.92),
+    Math.max((bottomAreaHeight / FIGMA_BOTTOM_AREA_HEIGHT) * heightScale, 0.92),
     1.08,
   );
   const openSheetHeight = Math.round(BOTTOM_SHEET_HEIGHT * bottomAreaScale);
   const openControlsBottom = Math.round(FIGMA_OPEN_CONTROLS_BOTTOM * bottomAreaScale);
-  const openJoystickPaddingTop = Math.round(32 * bottomAreaScale);
+  const openJoystickPaddingTop = Math.round(verticalScaleValue(32, 26, 36) * bottomAreaScale);
   const compactJoystickScale = Math.min(Math.max(bottomAreaScale, 0.94), 1.06);
   const joystickShellSize = isPanelOpen
     ? Math.round(150 * compactJoystickScale)
-    : 250;
+    : closedJoystickSize;
   const joystickCenter = joystickShellSize / 2;
   const joystickMaxDistance = isPanelOpen
     ? Math.round(COMPACT_JOYSTICK_MAX_DISTANCE * compactJoystickScale)
-    : DEFAULT_JOYSTICK_MAX_DISTANCE;
+    : Math.round(DEFAULT_JOYSTICK_MAX_DISTANCE * (joystickShellSize / 250));
+  const closedControlsBottom = insets.bottom + verticalScaleValue(CLOSED_CONTROLS_BOTTOM, 24, 34);
+  const expandRight = scaleValue(36, 28, 38);
+  const expandBottom = verticalScaleValue(16, 12, 20);
+  const otherImageSize = scaleValue(85, 76, 88);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -283,7 +322,7 @@ export const SurveillancePage: React.FC = () => {
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <TouchableOpacity
-            style={styles.headerButton}
+            style={[styles.headerButton, {left: headerSideInset}]}
             onPress={() => navigation.goBack()}
             activeOpacity={0.8}>
             <BackIcon />
@@ -295,11 +334,16 @@ export const SurveillancePage: React.FC = () => {
 
       <ImageBackground
         source={{uri: CAMERA_IMAGE}}
-        style={styles.cameraContainer}
+        style={[styles.cameraContainer, {height: cameraHeight}]}
         imageStyle={styles.cameraImage}
         resizeMode="cover">
         <View style={styles.cameraFallback} />
-        <TouchableOpacity style={styles.expandButton} activeOpacity={0.85}>
+        <TouchableOpacity
+          style={[
+            styles.expandButton,
+            {marginRight: expandRight, marginBottom: expandBottom},
+          ]}
+          activeOpacity={0.85}>
           <ExpandIcon />
         </TouchableOpacity>
       </ImageBackground>
@@ -315,7 +359,11 @@ export const SurveillancePage: React.FC = () => {
             style={styles.joystickGestureLayer}
             collapsable={false}
             {...panResponder.panHandlers}>
-            <JoystickPad compact={isPanelOpen} compactScale={compactJoystickScale} />
+            <JoystickPad
+              compact={isPanelOpen}
+              compactScale={compactJoystickScale}
+              shellSize={joystickShellSize}
+            />
             <View
               pointerEvents="none"
               style={[
@@ -351,7 +399,7 @@ export const SurveillancePage: React.FC = () => {
             styles.controlsRow,
             isPanelOpen
               ? {bottom: openControlsBottom}
-              : {bottom: insets.bottom + CLOSED_CONTROLS_BOTTOM},
+              : {bottom: closedControlsBottom},
           ]}>
           <TouchableOpacity style={styles.smallControl} activeOpacity={0.8}>
             <MicrophoneIcon />
@@ -374,6 +422,8 @@ export const SurveillancePage: React.FC = () => {
             style={[
               styles.bottomSheet,
               {
+                left: horizontalPadding,
+                right: horizontalPadding,
                 height: openSheetHeight,
               },
             ]}>
@@ -383,8 +433,15 @@ export const SurveillancePage: React.FC = () => {
               contentContainerStyle={[styles.otherGrid, {paddingBottom: insets.bottom + 16}]}
               showsVerticalScrollIndicator={false}>
               {OTHER_ITEMS.map(item => (
-                <TouchableOpacity key={item.title} style={styles.otherItem} activeOpacity={0.8}>
-                  <Image source={{uri: item.image}} style={styles.otherItemImage} resizeMode="contain" />
+                <TouchableOpacity
+                  key={item.title}
+                  style={styles.otherItem}
+                  activeOpacity={0.8}>
+                  <Image
+                    source={{uri: item.image}}
+                    style={[styles.otherItemImage, {width: otherImageSize, height: otherImageSize}]}
+                    resizeMode="contain"
+                  />
                   <Text
                     style={styles.otherItemLabel}
                     numberOfLines={1}
@@ -408,7 +465,6 @@ const styles = StyleSheet.create({
   },
   header: {
     height: 44,
-    paddingHorizontal: 30,
     backgroundColor: COLORS.white,
     justifyContent: 'center',
   },
@@ -421,7 +477,6 @@ const styles = StyleSheet.create({
   },
   headerButton: {
     position: 'absolute',
-    left: 0,
     top: 0,
     width: 24,
     height: 24,
@@ -438,7 +493,6 @@ const styles = StyleSheet.create({
   },
   cameraContainer: {
     width: '100%',
-    height: 273,
     justifyContent: 'flex-end',
     alignItems: 'flex-end',
     backgroundColor: COLORS.cameraFallback,
@@ -454,8 +508,6 @@ const styles = StyleSheet.create({
   expandButton: {
     width: 24,
     height: 24,
-    marginRight: 36,
-    marginBottom: 16,
     zIndex: 2,
     justifyContent: 'center',
     alignItems: 'center',
@@ -484,9 +536,6 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   joystickShell: {
-    width: 250,
-    height: 250,
-    borderRadius: 125,
     backgroundColor: COLORS.white,
     justifyContent: 'center',
     alignItems: 'center',
@@ -552,8 +601,6 @@ const styles = StyleSheet.create({
   },
   bottomSheet: {
     position: 'absolute',
-    left: 20,
-    right: 20,
     bottom: 0,
     height: BOTTOM_SHEET_HEIGHT,
     backgroundColor: COLORS.white,
@@ -587,8 +634,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   otherItemImage: {
-    width: 85,
-    height: 85,
     marginBottom: 12,
   },
   otherItemLabel: {
