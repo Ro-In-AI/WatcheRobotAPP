@@ -9,8 +9,11 @@ export { MotionPage } from './watcher/MotionPage';
 export { DancePage } from './watcher/DancePage';
 export { SurveillancePage } from './watcher/SurveillancePage';
 export { AnimationPage } from './watcher/AnimationPage';
+export { BindingGuidePage } from './watcher/BindingGuidePage';
+export { ScanCodePage } from './watcher/ScanCodePage';
+export { WifiSelectPage } from './watcher/WifiSelectPage';
 
 // Legacy pages (old versions, kept for reference)
-export { BluetoothPage as OldBluetoothPage } from './legacy/OldBluetoothPage';
-export { MotionPage as OldMotionPage } from './legacy/OldMotionPage';
-export { ControlPage as OldControlPage } from './legacy/OldControlPage';
+export { OldBluetoothPage } from './legacy/OldBluetoothPage';
+export { OldMotionPage } from './legacy/OldMotionPage';
+export { OldControlPage } from './legacy/OldControlPage';

@@ -1,6 +1,9 @@
-import React, {useState} from 'react';
+﻿import React, {useEffect, useRef, useState} from 'react';
 import {
+  Animated,
+  Easing,
   Image,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -9,7 +12,8 @@ import {
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {Svg, Path} from 'react-native-svg';
-import {useNavigation} from '@react-navigation/native';
+import {useNavigation, useRoute} from '@react-navigation/native';
+import type {RouteProp} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {
   AnimationIcon,
@@ -17,10 +21,12 @@ import {
   MotionIcon,
   SurveillanceIcon,
 } from '../../components/icons';
+import {bluetoothService} from '../../modules/bluetooth';
 import {useResponsiveScale} from '../../hooks/useResponsiveScale';
 import type {WatcherStackParamList} from '../../navigation/AppNavigator';
 
 type NavigationProp = NativeStackNavigationProp<WatcherStackParamList>;
+type RouteProps = RouteProp<WatcherStackParamList, 'WatcherHome'>;
 
 const COLORS = {
   background: '#F5F5F9',
@@ -32,13 +38,92 @@ const COLORS = {
   statusGray: '#8E959F',
   cardTitle: '#BABFC4',
   activeCardTitle: '#000000',
+  overlay: 'rgba(0, 0, 0, 0.65)',
+};
+
+type FailureType = 'bluetooth' | 'wifi' | null;
+
+const LoadingSpinner: React.FC = () => {
+  const rotateValue = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.timing(rotateValue, {
+        toValue: 1,
+        duration: 900,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+
+    animation.start();
+
+    return () => {
+      animation.stop();
+      rotateValue.setValue(0);
+    };
+  }, [rotateValue]);
+
+  const rotate = rotateValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  return (
+    <Animated.View style={{transform: [{rotate}]}}>
+      <Svg width={14} height={14} viewBox="0 0 14 14" fill="none">
+        <Path
+          d="M7 0.875C7.36244 0.875 7.65625 1.16881 7.65625 1.53125V2.84375C7.65625 3.20619 7.36244 3.5 7 3.5C6.63756 3.5 6.34375 3.20619 6.34375 2.84375V1.53125C6.34375 1.16881 6.63756 0.875 7 0.875Z"
+          fill="white"
+        />
+        <Path
+          d="M7 10.5C7.36244 10.5 7.65625 10.7938 7.65625 11.1562V12.4688C7.65625 12.8312 7.36244 13.125 7 13.125C6.63756 13.125 6.34375 12.8312 6.34375 12.4688V11.1562C6.34375 10.7938 6.63756 10.5 7 10.5Z"
+          fill="white"
+          fillOpacity="0.35"
+        />
+        <Path
+          d="M0.875 7C0.875 6.63756 1.16881 6.34375 1.53125 6.34375H2.84375C3.20619 6.34375 3.5 6.63756 3.5 7C3.5 7.36244 3.20619 7.65625 2.84375 7.65625H1.53125C1.16881 7.65625 0.875 7.36244 0.875 7Z"
+          fill="white"
+          fillOpacity="0.7"
+        />
+        <Path
+          d="M10.5 7C10.5 6.63756 10.7938 6.34375 11.1562 6.34375H12.4688C12.8312 6.34375 13.125 6.63756 13.125 7C13.125 7.36244 12.8312 7.65625 12.4688 7.65625H11.1562C10.7938 7.65625 10.5 7.36244 10.5 7Z"
+          fill="white"
+          fillOpacity="0.15"
+        />
+        <Path
+          d="M2.88775 2.88775C3.144 2.6315 3.5595 2.6315 3.81575 2.88775L4.74387 3.81587C5.00012 4.07212 5.00012 4.48763 4.74387 4.74387C4.48763 5.00012 4.07212 5.00012 3.81587 4.74387L2.88775 3.81575C2.6315 3.5595 2.6315 3.144 2.88775 2.88775Z"
+          fill="white"
+          fillOpacity="0.85"
+        />
+        <Path
+          d="M9.25613 9.25613C9.51237 8.99988 9.92788 8.99988 10.1841 9.25613L11.1122 10.1842C11.3685 10.4405 11.3685 10.856 11.1122 11.1122C10.856 11.3685 10.4405 11.3685 10.1842 11.1122L9.25613 10.1841C8.99988 9.92788 8.99988 9.51237 9.25613 9.25613Z"
+          fill="white"
+          fillOpacity="0.25"
+        />
+        <Path
+          d="M9.25613 4.74387C8.99988 4.48763 8.99988 4.07212 9.25613 3.81587L10.1842 2.88775C10.4405 2.6315 10.856 2.6315 11.1122 2.88775C11.3685 3.144 11.3685 3.5595 11.1122 3.81575L10.1841 4.74387C9.92788 5.00012 9.51237 5.00012 9.25613 4.74387Z"
+          fill="white"
+          fillOpacity="0.5"
+        />
+        <Path
+          d="M2.88775 11.1122C2.6315 10.856 2.6315 10.4405 2.88775 10.1842L3.81587 9.25613C4.07212 8.99988 4.48763 8.99988 4.74387 9.25613C5.00012 9.51237 5.00012 9.92788 4.74387 10.1841L3.81575 11.1122C3.5595 11.3685 3.144 11.3685 2.88775 11.1122Z"
+          fill="white"
+          fillOpacity="0.6"
+        />
+      </Svg>
+    </Animated.View>
+  );
 };
 
 export const WatcherPage: React.FC = () => {
   const insets = useSafeAreaInsets();
   const {windowWidth, scaleValue, verticalScaleValue} = useResponsiveScale();
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<RouteProps>();
   const [isConnected, setIsConnected] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [failureType, setFailureType] = useState<FailureType>(null);
 
   // 页面主要尺寸按统一响应式规则换算
   const horizontalPadding = scaleValue(20, 18, 24);
@@ -54,11 +139,89 @@ export const WatcherPage: React.FC = () => {
   const cardHeight = verticalScaleValue(116, 108, 122);
   const sectionTopPadding = verticalScaleValue(10, 8, 14);
 
+  useEffect(() => {
+    if (route.params?.connected) {
+      setFailureType(null);
+      setIsConnecting(false);
+      setIsConnected(true);
+      navigation.setParams({connected: undefined});
+    }
+  }, [navigation, route.params?.connected]);
+
+  const wait = (ms: number): Promise<void> =>
+    new Promise(resolve => {
+      const timer = setTimeout(resolve, ms);
+      return () => clearTimeout(timer);
+    });
+
+  const checkWifiReady = async () => {
+    try {
+      await Promise.race([
+        fetch('https://www.baidu.com/favicon.ico', {
+          method: 'GET',
+        }),
+        wait(2500).then(() => {
+          throw new Error('wifi-timeout');
+        }),
+      ]);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const handleConnectPress = async () => {
+    if (isConnecting) {
+      return;
+    }
+
+    if (isConnected) {
+      setIsConnected(false);
+      return;
+    }
+
+    setFailureType(null);
+    setIsConnecting(true);
+
+    try {
+      await wait(700);
+      const bluetoothState = await bluetoothService.getAdapterState();
+
+      if (bluetoothState !== 'PoweredOn') {
+        setFailureType('bluetooth');
+        return;
+      }
+
+      const wifiReady = await checkWifiReady();
+      if (!wifiReady) {
+        setFailureType('wifi');
+        return;
+      }
+
+      await wait(900);
+      setIsConnected(true);
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  const failureCopy =
+    failureType === 'bluetooth'
+      ? {
+          description:
+            'Connection failed. Please turn on the Bluetooth on your mobile phone.',
+          action: 'Go now',
+        }
+      : {
+          description: 'Connection failed. Please turn on WIFI.',
+          action: 'Go now',
+        };
+
   const cards = [
     {id: 'DANCE', title: 'DANCE', icon: DanceIcon},
     {id: 'MOTION', title: 'MOTION', icon: MotionIcon},
     {id: 'SURVEILLANCE', title: 'SURVEILLANCE', icon: SurveillanceIcon},
-    {id: 'ANIMATION', title: 'ANOMATION', icon: AnimationIcon},
+    {id: 'ANIMATION', title: 'ANIMATION', icon: AnimationIcon},
   ];
 
   return (
@@ -130,11 +293,19 @@ export const WatcherPage: React.FC = () => {
               styles.connectButton,
               isConnected && styles.connectButtonDisabled,
             ]}
-            onPress={() => setIsConnected(!isConnected)}
+            onPress={handleConnectPress}
+            onLongPress={() => navigation.navigate('BindingGuide')}
             activeOpacity={0.85}>
-            <Text style={styles.connectButtonText}>
-              {isConnected ? 'Disconnect' : 'Connect the device'}
-            </Text>
+            {isConnecting ? (
+              <View style={styles.loadingContent}>
+                <LoadingSpinner />
+                <Text style={styles.connectButtonText}>Connect the device</Text>
+              </View>
+            ) : (
+              <Text style={styles.connectButtonText}>
+                {isConnected ? 'Disconnect' : 'Connect the device'}
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -146,7 +317,8 @@ export const WatcherPage: React.FC = () => {
               <TouchableOpacity
                 key={card.id}
                 style={[styles.gridCard, {width: cardWidth, height: cardHeight}]}
-                activeOpacity={0.85}
+                activeOpacity={isConnected && !isConnecting ? 0.85 : 1}
+                disabled={!isConnected || isConnecting}
                 onPress={() => {
                   const routeName: keyof WatcherStackParamList =
                     card.id === 'DANCE'
@@ -176,6 +348,41 @@ export const WatcherPage: React.FC = () => {
           })}
         </View>
       </ScrollView>
+
+      <Modal
+        visible={failureType !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setFailureType(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalIconWrap}>
+              <Text style={styles.modalIconText}>!</Text>
+            </View>
+            <Text style={styles.modalTitle}>Connection Failed</Text>
+            <Text style={styles.modalDescription}>{failureCopy.description}</Text>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalSecondaryButton}
+                activeOpacity={0.85}
+                onPress={() => setFailureType(null)}>
+                <Text style={styles.modalSecondaryText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.modalPrimaryButton}
+                activeOpacity={0.85}
+                onPress={() => {
+                  setFailureType(null);
+                  navigation.navigate('BindingGuide');
+                }}>
+                <Text style={styles.modalPrimaryText}>{failureCopy.action}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -276,6 +483,11 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     textAlign: 'center',
   },
+  loadingContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   gridContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -305,5 +517,91 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.cardTitle,
     lineHeight: 16,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: COLORS.overlay,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 34,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 324,
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    paddingHorizontal: 30,
+    paddingTop: 30,
+    paddingBottom: 30,
+    alignItems: 'center',
+  },
+  modalIconWrap: {
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+    backgroundColor: '#DCE1E9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modalIconText: {
+    fontFamily: 'Inter',
+    fontSize: 44,
+    lineHeight: 44,
+    fontWeight: '700',
+    color: COLORS.white,
+  },
+  modalTitle: {
+    fontFamily: 'Inter',
+    fontSize: 18,
+    lineHeight: 18,
+    fontWeight: '500',
+    color: COLORS.black,
+    marginBottom: 12,
+  },
+  modalDescription: {
+    fontFamily: 'Inter',
+    fontSize: 14,
+    lineHeight: 21,
+    fontWeight: '400',
+    color: '#636A74',
+    textAlign: 'center',
+    marginBottom: 24,
+    maxWidth: 264,
+  },
+  modalActions: {
+    width: '100%',
+    flexDirection: 'row',
+    gap: 20,
+  },
+  modalSecondaryButton: {
+    flex: 1,
+    height: 50,
+    borderRadius: 30,
+    backgroundColor: '#F5F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalPrimaryButton: {
+    flex: 1,
+    height: 50,
+    borderRadius: 30,
+    backgroundColor: COLORS.green,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalSecondaryText: {
+    fontFamily: 'Inter',
+    fontSize: 14,
+    lineHeight: 14,
+    fontWeight: '600',
+    color: COLORS.green,
+  },
+  modalPrimaryText: {
+    fontFamily: 'Inter',
+    fontSize: 14,
+    lineHeight: 14,
+    fontWeight: '600',
+    color: COLORS.white,
   },
 });

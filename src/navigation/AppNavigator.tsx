@@ -8,21 +8,27 @@ import {MomentsIcon, NearbyIcon, UserIcon, WatcherIcon} from './TabBarIcons';
 
 import {
   AnimationPage,
+  BindingGuidePage,
   DancePage,
   MomentsPage,
   MotionPage,
   NearbyPage,
+  ScanCodePage,
   SurveillancePage,
   UserPage,
   WatcherPage,
+  WifiSelectPage,
 } from '../screens';
 
 export type WatcherStackParamList = {
-  WatcherHome: undefined;
+  WatcherHome: {connected?: boolean} | undefined;
   Dance: undefined;
   Motion: undefined;
   Surveillance: undefined;
   Animation: undefined;
+  BindingGuide: undefined;
+  ScanCode: undefined;
+  WifiSelect: undefined;
 };
 
 export type RootTabParamList = {
@@ -136,6 +142,9 @@ const WatcherStack: React.FC = () => {
       <Stack.Screen name="Motion" component={MotionPage} />
       <Stack.Screen name="Surveillance" component={SurveillancePage} />
       <Stack.Screen name="Animation" component={AnimationPage} />
+      <Stack.Screen name="BindingGuide" component={BindingGuidePage} />
+      <Stack.Screen name="ScanCode" component={ScanCodePage} />
+      <Stack.Screen name="WifiSelect" component={WifiSelectPage} />
     </Stack.Navigator>
   );
 };
