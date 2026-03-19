@@ -17,6 +17,7 @@ import {
 import {useNavigation} from '@react-navigation/native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import Svg, {Circle, Defs, Ellipse, LinearGradient, Path, Stop} from 'react-native-svg';
+import {WatcherHeader} from '../../components/WatcherHeader';
 
 const COLORS = {
   background: '#F2F2F7',
@@ -75,15 +76,6 @@ const OTHER_ITEMS = [
     image: 'https://www.figma.com/api/mcp/asset/27de6292-8b77-4fc1-ae10-25745036835e',
   },
 ];
-
-const BackIcon: React.FC = () => (
-  <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-    <Path
-      d="M9.23544 11.9995L17.3905 19.8827C17.8711 20.3481 17.8711 21.1014 17.3905 21.5653C16.9098 22.03 16.13 22.03 15.6494 21.5653L6.62452 12.8406C6.14458 12.376 6.14458 11.6223 6.62452 11.1591L15.6494 2.43481C15.8905 2.20246 16.2055 2.0863 16.5207 2.0863C16.8358 2.0863 17.1509 2.20248 17.3905 2.43555C17.8711 2.90024 17.8711 3.65242 17.3905 4.1171L9.23544 11.9995Z"
-      fill={COLORS.black}
-    />
-  </Svg>
-);
 
 const MicrophoneIcon: React.FC = () => (
   <Svg width={22} height={22} viewBox="0 0 22 22" fill="none">
@@ -319,18 +311,11 @@ export const SurveillancePage: React.FC = () => {
   return (
     <View style={styles.container}>
       <View style={{height: insets.top, backgroundColor: COLORS.white}} />
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <TouchableOpacity
-            style={[styles.headerButton, {left: headerSideInset}]}
-            onPress={() => navigation.goBack()}
-            activeOpacity={0.8}>
-            <BackIcon />
-          </TouchableOpacity>
-
-          <Text style={styles.headerTitle}>Surveillance</Text>
-        </View>
-      </View>
+      <WatcherHeader
+        title="Surveillance"
+        onBack={() => navigation.goBack()}
+        sideInset={headerSideInset}
+      />
 
       <ImageBackground
         source={{uri: CAMERA_IMAGE}}
@@ -462,34 +447,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-  },
-  header: {
-    height: 44,
-    backgroundColor: COLORS.white,
-    justifyContent: 'center',
-  },
-  headerContent: {
-    width: '100%',
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  headerButton: {
-    position: 'absolute',
-    top: 0,
-    width: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontFamily: 'SF Pro',
-    fontSize: 18,
-    lineHeight: 18,
-    fontWeight: '500',
-    color: '#1A1A1A',
-    textAlign: 'center',
   },
   cameraContainer: {
     width: '100%',

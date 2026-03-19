@@ -11,6 +11,7 @@ import {
 import {useNavigation} from '@react-navigation/native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import Svg, {Path} from 'react-native-svg';
+import {WatcherHeader} from '../../components/WatcherHeader';
 
 const COLORS = {
   background: '#F0F0F6',
@@ -127,65 +128,13 @@ const PlayIcon: React.FC = () => (
   </Svg>
 );
 
-const BackIcon: React.FC = () => (
-  <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-    <Path
-      d="M9.23544 11.9995L17.3905 19.8827C17.8711 20.3481 17.8711 21.1014 17.3905 21.5653C16.9098 22.03 16.13 22.03 15.6494 21.5653L6.62452 12.8406C6.14458 12.376 6.14458 11.6223 6.62452 11.1591L15.6494 2.43481C15.8905 2.20246 16.2055 2.0863 16.5207 2.0863C16.8358 2.0863 17.1509 2.20248 17.3905 2.43555C17.8711 2.90024 17.8711 3.65242 17.3905 4.1171L9.23544 11.9995Z"
-      fill="#000000"
-    />
-  </Svg>
-);
-
-const GroupCard: React.FC<{title: string; items: ThumbnailItem[]}> = ({
-  title,
-  items,
-}) => (
-  <View style={styles.card}>
-    <View style={styles.cardHeader}>
-      <Text style={styles.cardTitle}>{title}</Text>
-      <TouchableOpacity style={styles.playButton} activeOpacity={0.8}>
-        <PlayIcon />
-      </TouchableOpacity>
-    </View>
-
-    <View style={styles.thumbnailRow}>
-      {items.map((item, index) => {
-        if (item.type === 'placeholder') {
-          return <View key={`${title}-${index}`} style={styles.placeholder} />;
-        }
-
-        if (item.type === 'composite') {
-          return (
-            <View key={`${title}-${index}`} style={styles.thumbnail}>
-              <Image source={{uri: item.backgroundUri}} style={styles.thumbnailImage} />
-              <Image
-                source={{uri: item.overlayUri}}
-                style={styles.thumbnailOverlay}
-                resizeMode="contain"
-              />
-            </View>
-          );
-        }
-
-        return (
-          <View key={`${title}-${index}`} style={styles.thumbnail}>
-            <Image source={{uri: item.uri}} style={styles.thumbnailImage} />
-          </View>
-        );
-      })}
-    </View>
-  </View>
-);
-
-/**
- * Animation 页面
- */
 export const AnimationPage: React.FC = () => {
   const insets = useSafeAreaInsets();
   const {width: windowWidth, height: windowHeight} = useWindowDimensions();
   const navigation = useNavigation();
   const widthScale = Math.min(Math.max(windowWidth / 393, 0.92), 1.12);
   const heightScale = Math.min(Math.max(windowHeight / 852, 0.88), 1.1);
+
   const scaleValue = (value: number, min?: number, max?: number) => {
     const scaled = value * widthScale;
     if (typeof min === 'number' && scaled < min) {
@@ -196,6 +145,7 @@ export const AnimationPage: React.FC = () => {
     }
     return scaled;
   };
+
   const verticalScaleValue = (value: number, min?: number, max?: number) => {
     const scaled = value * heightScale;
     if (typeof min === 'number' && scaled < min) {
@@ -206,13 +156,18 @@ export const AnimationPage: React.FC = () => {
     }
     return scaled;
   };
+
   const horizontalPadding = scaleValue(20, 18, 24);
   const headerSideInset = scaleValue(30, 26, 32);
   const topPadding = verticalScaleValue(24, 20, 28);
   const cardGap = verticalScaleValue(16, 14, 18);
-  const descriptionWidth = windowWidth - horizontalPadding * 2 - scaleValue(16, 12, 16);
+  const descriptionWidth =
+    windowWidth - horizontalPadding * 2 - scaleValue(16, 12, 16);
   const contentWidth = windowWidth - horizontalPadding * 2;
-  const thumbSize = Math.min(scaleValue(54, 48, 58), (contentWidth - 32 - 52) / 5);
+  const thumbSize = Math.min(
+    scaleValue(54, 48, 58),
+    (contentWidth - 32 - 52) / 5,
+  );
   const overlayTop = Math.round(thumbSize * (17 / 54));
   const overlayLeft = Math.round(thumbSize * (8 / 54));
   const overlayWidth = Math.round(thumbSize * (39 / 54));
@@ -221,17 +176,11 @@ export const AnimationPage: React.FC = () => {
   return (
     <View style={styles.container}>
       <View style={{height: insets.top, backgroundColor: COLORS.white}} />
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <TouchableOpacity
-            style={[styles.headerButton, {left: headerSideInset}]}
-            onPress={() => navigation.goBack()}
-            activeOpacity={0.8}>
-            <BackIcon />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Anomation</Text>
-        </View>
-      </View>
+      <WatcherHeader
+        title="Anomation"
+        onBack={() => navigation.goBack()}
+        sideInset={headerSideInset}
+      />
 
       <ScrollView
         style={styles.scrollView}
@@ -290,7 +239,10 @@ export const AnimationPage: React.FC = () => {
                         ]}>
                         <Image
                           source={{uri: item.backgroundUri}}
-                          style={[styles.thumbnailImage, {borderRadius: thumbSize / 2}]}
+                          style={[
+                            styles.thumbnailImage,
+                            {borderRadius: thumbSize / 2},
+                          ]}
                         />
                         <Image
                           source={{uri: item.overlayUri}}
@@ -322,7 +274,10 @@ export const AnimationPage: React.FC = () => {
                       ]}>
                       <Image
                         source={{uri: item.uri}}
-                        style={[styles.thumbnailImage, {borderRadius: thumbSize / 2}]}
+                        style={[
+                          styles.thumbnailImage,
+                          {borderRadius: thumbSize / 2},
+                        ]}
                       />
                     </View>
                   );
@@ -340,34 +295,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-  },
-  header: {
-    backgroundColor: COLORS.white,
-    height: 44,
-    justifyContent: 'center',
-  },
-  headerContent: {
-    width: '100%',
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  headerButton: {
-    position: 'absolute',
-    top: 0,
-    width: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontFamily: 'SF Pro',
-    fontSize: 18,
-    lineHeight: 18,
-    fontWeight: '500',
-    color: COLORS.text,
-    textAlign: 'center',
   },
   scrollView: {
     flex: 1,
