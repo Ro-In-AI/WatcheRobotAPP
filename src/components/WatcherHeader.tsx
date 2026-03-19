@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import {StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 import Svg, {Path} from 'react-native-svg';
 
@@ -28,6 +28,8 @@ export const WatcherHeader: React.FC<WatcherHeaderProps> = ({
 }) => (
   <View style={[styles.header, {backgroundColor}]}>
     <View style={styles.headerContent}>
+      {/* 返回按钮 */}
+      {/* 左右操作位用绝对定位，保证标题始终保持视觉居中。 */}
       <TouchableOpacity
         style={[styles.headerButton, {left: sideInset}]}
         onPress={onBack}
@@ -35,9 +37,11 @@ export const WatcherHeader: React.FC<WatcherHeaderProps> = ({
         <BackIcon />
       </TouchableOpacity>
 
+      {/* 中间标题 */}
       <Text style={styles.headerTitle}>{title}</Text>
 
       {rightSlot ? (
+        /* 右侧扩展操作位 */
         <View style={[styles.rightSlot, {right: sideInset}]}>{rightSlot}</View>
       ) : null}
     </View>

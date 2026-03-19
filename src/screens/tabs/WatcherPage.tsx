@@ -5,7 +5,6 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -18,6 +17,7 @@ import {
   MotionIcon,
   SurveillanceIcon,
 } from '../../components/icons';
+import {useResponsiveScale} from '../../hooks/useResponsiveScale';
 import type {WatcherStackParamList} from '../../navigation/AppNavigator';
 
 type NavigationProp = NativeStackNavigationProp<WatcherStackParamList>;
@@ -36,34 +36,11 @@ const COLORS = {
 
 export const WatcherPage: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const {width: windowWidth, height: windowHeight} = useWindowDimensions();
+  const {windowWidth, scaleValue, verticalScaleValue} = useResponsiveScale();
   const navigation = useNavigation<NavigationProp>();
   const [isConnected, setIsConnected] = useState(false);
 
-  const widthScale = Math.min(Math.max(windowWidth / 393, 0.92), 1.12);
-  const heightScale = Math.min(Math.max(windowHeight / 852, 0.88), 1.1);
-  const scaleValue = (value: number, min?: number, max?: number) => {
-    const scaled = value * widthScale;
-    if (typeof min === 'number' && scaled < min) {
-      return min;
-    }
-    if (typeof max === 'number' && scaled > max) {
-      return max;
-    }
-    return scaled;
-  };
-
-  const verticalScaleValue = (value: number, min?: number, max?: number) => {
-    const scaled = value * heightScale;
-    if (typeof min === 'number' && scaled < min) {
-      return min;
-    }
-    if (typeof max === 'number' && scaled > max) {
-      return max;
-    }
-    return scaled;
-  };
-
+  // 页面主要尺寸按统一响应式规则换算
   const horizontalPadding = scaleValue(20, 18, 24);
   const contentWidth = windowWidth - horizontalPadding * 2;
   const heroWidth = Math.min(contentWidth, scaleValue(333, 308, 352));
@@ -96,6 +73,7 @@ export const WatcherPage: React.FC = () => {
           },
         ]}
         showsVerticalScrollIndicator={false}>
+        {/* 顶部标题和通知入口 */}
         <View style={[styles.header, {marginBottom: headerBottom}]}>
           <View style={styles.headerLeft}>
             <Text style={styles.headerTitle}>
@@ -114,6 +92,7 @@ export const WatcherPage: React.FC = () => {
           </TouchableOpacity>
         </View>
 
+        {/* 中间设备主视觉和在线状态 */}
         <View
           style={[
             styles.heroSection,
@@ -139,6 +118,7 @@ export const WatcherPage: React.FC = () => {
           </View>
         </View>
 
+        {/* 设备连接按钮 */}
         <View
           style={[
             styles.heroSection,
@@ -158,6 +138,7 @@ export const WatcherPage: React.FC = () => {
           </TouchableOpacity>
         </View>
 
+        {/* 底部功能入口卡片 */}
         <View style={[styles.gridContainer, {columnGap: gridGap}]}>
           {cards.map(card => {
             const IconComponent = card.icon;

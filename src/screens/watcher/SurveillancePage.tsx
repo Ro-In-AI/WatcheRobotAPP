@@ -1,23 +1,28 @@
-import React, {useEffect, useRef, useState} from 'react';
+﻿import React, {useCallback, useEffect, useState} from 'react';
 import {
   LayoutAnimation,
   Image,
   ImageBackground,
   LayoutChangeEvent,
-  PanResponder,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   UIManager,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import Svg, {Circle, Defs, Ellipse, LinearGradient, Path, Stop} from 'react-native-svg';
+import Svg, {Circle, Ellipse, Path} from 'react-native-svg';
+import {
+  BluetoothStatus,
+  BLUETOOTH_UUIDS,
+  COMMANDS,
+  useBluetooth,
+} from '../../modules/bluetooth';
 import {WatcherHeader} from '../../components/WatcherHeader';
+import {useResponsiveScale} from '../../hooks/useResponsiveScale';
 
 const COLORS = {
   background: '#F2F2F7',
@@ -35,9 +40,6 @@ const FIGMA_BOTTOM_AREA_HEIGHT = 479;
 const BOTTOM_SHEET_HEIGHT = 188;
 const FIGMA_OPEN_CONTROLS_BOTTOM = 203;
 const CLOSED_CONTROLS_BOTTOM = 28;
-const JOYSTICK_KNOB_RADIUS = 30;
-const DEFAULT_JOYSTICK_MAX_DISTANCE = 43;
-const COMPACT_JOYSTICK_MAX_DISTANCE = 28;
 const OTHER_ITEMS = [
   {
     title: 'Love',
@@ -123,9 +125,28 @@ const Arrow: React.FC<{
   direction: 'up' | 'right' | 'down' | 'left';
   compact?: boolean;
   compactScale?: number;
-}> = ({direction, compact = false, compactScale = 1}) => {
-  const compactOffset = Math.round(17 * compactScale);
-  const iconSize = Math.round((compact ? 20 : 28) * compactScale);
+  shellSize: number;
+  disabled?: boolean;
+  onPressIn?: () => void;
+  onPressOut?: () => void;
+}> = ({
+  direction,
+  compact = false,
+  compactScale = 1,
+  shellSize,
+  disabled = false,
+  onPressIn,
+  onPressOut,
+}) => {
+  const centerOuterSize = shellSize * (79 / 185);
+  const directionButtonSize = compact ? Math.round(34 * compactScale) : 42;
+  const iconSize = compact ? Math.round(28 * compactScale) : 35;
+  const shellRadius = shellSize / 2;
+  const centerRadius = centerOuterSize / 2;
+  const directionTrackRadius =
+    centerRadius + (shellRadius - centerRadius) * (compact ? 0.42 : 0.35);
+  const crossAxisOffset = shellRadius - directionButtonSize / 2;
+  const edgeOffset = shellRadius - directionButtonSize / 2 - directionTrackRadius;
   const rotations = {
     up: '0deg',
     right: '90deg',
@@ -133,17 +154,26 @@ const Arrow: React.FC<{
     left: '270deg',
   } as const;
   const positions = {
-    up: compact ? {top: compactOffset} : styles.arrowUp,
-    right: compact ? {right: compactOffset} : styles.arrowRight,
-    down: compact ? {bottom: compactOffset} : styles.arrowDown,
-    left: compact ? {left: compactOffset} : styles.arrowLeft,
+    up: {top: edgeOffset, left: crossAxisOffset},
+    right: {right: edgeOffset, top: crossAxisOffset},
+    down: {bottom: edgeOffset, left: crossAxisOffset},
+    left: {left: edgeOffset, top: crossAxisOffset},
   } as const;
 
   return (
-    <View
+    <TouchableOpacity
+      activeOpacity={0.8}
+      disabled={disabled}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
       style={[
         styles.arrowWrapper,
         positions[direction],
+        {
+          width: directionButtonSize,
+          height: directionButtonSize,
+          borderRadius: directionButtonSize / 2,
+        },
         {transform: [{rotate: rotations[direction]}]},
       ]}>
       <Svg width={iconSize} height={iconSize} viewBox="0 0 28 28" fill="none">
@@ -152,7 +182,7 @@ const Arrow: React.FC<{
           fill={COLORS.green}
         />
       </Svg>
-    </View>
+    </TouchableOpacity>
   );
 };
 
@@ -160,17 +190,29 @@ const JoystickPad: React.FC<{
   compact?: boolean;
   compactScale?: number;
   shellSize: number;
+  disabled?: boolean;
+  onArrowPressIn: (servoId: number, direction: number) => void;
+  onArrowPressOut: (servoId: number) => void;
 }> = ({
   compact = false,
   compactScale = 1,
   shellSize,
+  disabled = false,
+  onArrowPressIn,
+  onArrowPressOut,
 }) => {
   const currentShellSize = compact
     ? Math.round(150 * compactScale)
     : shellSize;
   const currentRadius = Math.round(currentShellSize / 2);
-  const currentCenterSize = Math.round(currentShellSize * (104 / 250));
+  const currentCenterSize = Math.round(currentShellSize * (79 / 185));
   const currentCenterRadius = Math.round(currentCenterSize / 2);
+  const currentRingSize = Math.round(currentShellSize * (51.12 / 185));
+  const currentRingRadius = Math.round(currentRingSize / 2);
+  const currentRingBorderWidth = Math.max(
+    6,
+    Math.round(currentShellSize * (8 / 185)),
+  );
 
   return (
     <View
@@ -182,10 +224,42 @@ const JoystickPad: React.FC<{
           borderRadius: currentRadius,
         },
       ]}>
-      <Arrow direction="up" compact={compact} compactScale={compactScale} />
-      <Arrow direction="right" compact={compact} compactScale={compactScale} />
-      <Arrow direction="down" compact={compact} compactScale={compactScale} />
-      <Arrow direction="left" compact={compact} compactScale={compactScale} />
+      <Arrow
+        direction="up"
+        compact={compact}
+        compactScale={compactScale}
+        shellSize={currentShellSize}
+        disabled={disabled}
+        onPressIn={() => onArrowPressIn(1, 1)}
+        onPressOut={() => onArrowPressOut(1)}
+      />
+      <Arrow
+        direction="right"
+        compact={compact}
+        compactScale={compactScale}
+        shellSize={currentShellSize}
+        disabled={disabled}
+        onPressIn={() => onArrowPressIn(0, 1)}
+        onPressOut={() => onArrowPressOut(0)}
+      />
+      <Arrow
+        direction="down"
+        compact={compact}
+        compactScale={compactScale}
+        shellSize={currentShellSize}
+        disabled={disabled}
+        onPressIn={() => onArrowPressIn(1, -1)}
+        onPressOut={() => onArrowPressOut(1)}
+      />
+      <Arrow
+        direction="left"
+        compact={compact}
+        compactScale={compactScale}
+        shellSize={currentShellSize}
+        disabled={disabled}
+        onPressIn={() => onArrowPressIn(0, -1)}
+        onPressOut={() => onArrowPressOut(0)}
+      />
 
       <View
         style={[
@@ -195,46 +269,44 @@ const JoystickPad: React.FC<{
             height: currentCenterSize,
             borderRadius: currentCenterRadius,
           },
-        ]}
-      />
+        ]}>
+        <View
+          style={[
+            styles.centerRing,
+            {
+              width: currentRingSize,
+              height: currentRingSize,
+              borderRadius: currentRingRadius,
+              borderWidth: currentRingBorderWidth,
+            },
+          ]}
+        />
+      </View>
     </View>
   );
 };
 
 export const SurveillancePage: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const {width: windowWidth, height: windowHeight} = useWindowDimensions();
+  const {
+    windowWidth,
+    heightScale,
+    scaleValue,
+    verticalScaleValue,
+  } = useResponsiveScale();
   const navigation = useNavigation();
+  const {status, sendCommand} = useBluetooth();
   const [isPanelOpen, setIsPanelOpen] = useState(false);
-  const [joystickOffset, setJoystickOffset] = useState({x: 0, y: 0});
   const [bottomAreaHeight, setBottomAreaHeight] = useState(FIGMA_BOTTOM_AREA_HEIGHT);
-  const panStartRef = useRef({x: 0, y: 0});
-  const widthScale = Math.min(Math.max(windowWidth / 393, 0.92), 1.12);
-  const heightScale = Math.min(Math.max(windowHeight / 852, 0.88), 1.1);
-  const scaleValue = (value: number, min?: number, max?: number) => {
-    const scaled = value * widthScale;
-    if (typeof min === 'number' && scaled < min) {
-      return min;
-    }
-    if (typeof max === 'number' && scaled > max) {
-      return max;
-    }
-    return scaled;
-  };
-  const verticalScaleValue = (value: number, min?: number, max?: number) => {
-    const scaled = value * heightScale;
-    if (typeof min === 'number' && scaled < min) {
-      return min;
-    }
-    if (typeof max === 'number' && scaled > max) {
-      return max;
-    }
-    return scaled;
-  };
+  const isConnected = status === BluetoothStatus.Connected;
+
+  // 页面关键尺寸按统一响应式规则换算
   const headerSideInset = scaleValue(30, 26, 32);
   const horizontalPadding = scaleValue(20, 18, 24);
   const cameraHeight = verticalScaleValue(273, 248, 292);
   const closedJoystickSize = Math.min(scaleValue(250, 224, 268), windowWidth * 0.64);
+  // 展开态按底部区域的实际高度做比例换算，
+  // 这样不同机型下控制区的上下关系会更接近设计稿。
   const bottomAreaScale = Math.min(
     Math.max((bottomAreaHeight / FIGMA_BOTTOM_AREA_HEIGHT) * heightScale, 0.92),
     1.08,
@@ -246,46 +318,30 @@ export const SurveillancePage: React.FC = () => {
   const joystickShellSize = isPanelOpen
     ? Math.round(150 * compactJoystickScale)
     : closedJoystickSize;
-  const joystickCenter = joystickShellSize / 2;
-  const joystickMaxDistance = isPanelOpen
-    ? Math.round(COMPACT_JOYSTICK_MAX_DISTANCE * compactJoystickScale)
-    : Math.round(DEFAULT_JOYSTICK_MAX_DISTANCE * (joystickShellSize / 250));
   const closedControlsBottom = insets.bottom + verticalScaleValue(CLOSED_CONTROLS_BOTTOM, 24, 34);
   const expandRight = scaleValue(36, 28, 38);
   const expandBottom = verticalScaleValue(16, 12, 20);
   const otherImageSize = scaleValue(85, 76, 88);
+  // 轮盘方向控制和 Motion 页同步：按住方向发送，松手停止。
+  const sendMoveCommand = useCallback(
+    async (servoId: number, direction: number) => {
+      if (!isConnected) {
+        return;
+      }
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        panStartRef.current = joystickOffset;
-      },
-      onPanResponderMove: (_, gestureState) => {
-        const nextX = panStartRef.current.x + gestureState.dx;
-        const nextY = panStartRef.current.y + gestureState.dy;
-        const distance = Math.sqrt(nextX * nextX + nextY * nextY);
-
-        if (distance <= joystickMaxDistance) {
-          setJoystickOffset({x: nextX, y: nextY});
-          return;
-        }
-
-        const angle = Math.atan2(nextY, nextX);
-        setJoystickOffset({
-          x: Math.cos(angle) * joystickMaxDistance,
-          y: Math.sin(angle) * joystickMaxDistance,
+      try {
+        await sendCommand({
+          data: COMMANDS.SERVO_MOVE(servoId, direction),
+          serviceUUID: BLUETOOTH_UUIDS.SERVICE_UUID,
+          characteristicUUID: BLUETOOTH_UUIDS.SERVO_CTRL,
+          type: 'response',
         });
-      },
-      onPanResponderRelease: () => {
-        setJoystickOffset({x: 0, y: 0});
-      },
-      onPanResponderTerminate: () => {
-        setJoystickOffset({x: 0, y: 0});
-      },
-    }),
-  ).current;
+      } catch {
+        // 方向控制是高频交互，命令失败时这里不弹提示，避免打断操作。
+      }
+    },
+    [isConnected, sendCommand],
+  );
 
   const handleBottomAreaLayout = (event: LayoutChangeEvent) => {
     const nextHeight = Math.round(event.nativeEvent.layout.height);
@@ -311,6 +367,7 @@ export const SurveillancePage: React.FC = () => {
   return (
     <View style={styles.container}>
       <View style={{height: insets.top, backgroundColor: COLORS.white}} />
+      {/* 公共页眉 */}
       <WatcherHeader
         title="Surveillance"
         onBack={() => navigation.goBack()}
@@ -322,6 +379,7 @@ export const SurveillancePage: React.FC = () => {
         style={[styles.cameraContainer, {height: cameraHeight}]}
         imageStyle={styles.cameraImage}
         resizeMode="cover">
+        {/* 摄像头预览右下角放大按钮 */}
         <View style={styles.cameraFallback} />
         <TouchableOpacity
           style={[
@@ -334,110 +392,81 @@ export const SurveillancePage: React.FC = () => {
       </ImageBackground>
 
       <View style={styles.bottomArea} onLayout={handleBottomAreaLayout}>
+        {/* 上半部分摇杆区域 */}
         <View
           style={[
             styles.joystickSection,
             isPanelOpen && styles.joystickSectionOpen,
             isPanelOpen && {paddingTop: openJoystickPaddingTop},
           ]}>
-          <View
-            style={styles.joystickGestureLayer}
-            collapsable={false}
-            {...panResponder.panHandlers}>
+          <View style={styles.joystickGestureLayer}>
             <JoystickPad
               compact={isPanelOpen}
               compactScale={compactJoystickScale}
               shellSize={joystickShellSize}
+              disabled={!isConnected}
+              onArrowPressIn={sendMoveCommand}
+              onArrowPressOut={(servoId: number) => sendMoveCommand(servoId, 0)}
             />
-            <View
-              pointerEvents="none"
-              style={[
-                styles.joystickKnobOverlay,
-                {
-                  left: joystickCenter - JOYSTICK_KNOB_RADIUS + joystickOffset.x,
-                  top: joystickCenter - JOYSTICK_KNOB_RADIUS + joystickOffset.y,
-                },
-              ]}>
-              <Svg width={60} height={60} viewBox="0 0 60 60" fill="none">
-                <Defs>
-                  <LinearGradient id="surveillanceKnobGradient" x1="30" y1="8" x2="30" y2="52">
-                    <Stop offset="0" stopColor={COLORS.greenDark} />
-                    <Stop offset="1" stopColor={COLORS.green} />
-                  </LinearGradient>
-                </Defs>
-                <Ellipse cx={30} cy={30} rx={20} ry={20} fill={COLORS.white} />
-                <Ellipse
-                  cx={30}
-                  cy={30}
-                  rx={15.5}
-                  ry={15.5}
-                  stroke="url(#surveillanceKnobGradient)"
-                  strokeWidth={8}
-                />
-              </Svg>
-            </View>
           </View>
         </View>
 
+        {/* 底部控制按钮 */}
         <View
           style={[
             styles.controlsRow,
-            isPanelOpen
-              ? {bottom: openControlsBottom}
-              : {bottom: closedControlsBottom},
+            isPanelOpen ? {bottom: openControlsBottom} : {bottom: closedControlsBottom},
           ]}>
-          <TouchableOpacity style={styles.smallControl} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.smallControlButton} activeOpacity={0.85}>
             <MicrophoneIcon />
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.captureButton}
-            activeOpacity={0.8}
+            style={styles.mainControlButton}
+            activeOpacity={0.88}
             onPress={handleTogglePanel}>
             <FaceIcon color={isPanelOpen ? COLORS.green : '#0D0D0D'} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.smallControl} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.smallControlButton} activeOpacity={0.85}>
             <SpeakerIcon />
           </TouchableOpacity>
-          </View>
+        </View>
 
-        {isPanelOpen && (
+        {isPanelOpen ? (
+          /* 展开后显示底部 Other 抽屉 */
           <View
             style={[
               styles.bottomSheet,
               {
+                height: openSheetHeight,
                 left: horizontalPadding,
                 right: horizontalPadding,
-                height: openSheetHeight,
               },
             ]}>
-            <Text style={styles.bottomSheetTitle}>Other</Text>
+            <Text style={styles.otherTitle}>Other</Text>
+
             <ScrollView
-              style={styles.bottomSheetScroll}
-              contentContainerStyle={[styles.otherGrid, {paddingBottom: insets.bottom + 16}]}
+              contentContainerStyle={[
+                styles.otherGrid,
+                {paddingBottom: insets.bottom + 16},
+              ]}
               showsVerticalScrollIndicator={false}>
               {OTHER_ITEMS.map(item => (
-                <TouchableOpacity
-                  key={item.title}
-                  style={styles.otherItem}
-                  activeOpacity={0.8}>
+                <TouchableOpacity key={item.title} style={styles.otherItem} activeOpacity={0.85}>
                   <Image
                     source={{uri: item.image}}
-                    style={[styles.otherItemImage, {width: otherImageSize, height: otherImageSize}]}
+                    style={[styles.otherImage, {width: otherImageSize, height: otherImageSize}]}
                     resizeMode="contain"
                   />
-                  <Text
-                    style={styles.otherItemLabel}
-                    numberOfLines={1}
-                    ellipsizeMode="tail">
+                  <Text style={styles.otherLabel} numberOfLines={2}>
                     {item.title}
                   </Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
           </View>
-        )}
+        ) : null}
       </View>
     </View>
   );
@@ -451,7 +480,7 @@ const styles = StyleSheet.create({
   cameraContainer: {
     width: '100%',
     justifyContent: 'flex-end',
-    alignItems: 'flex-end',
+    overflow: 'hidden',
     backgroundColor: COLORS.cameraFallback,
   },
   cameraImage: {
@@ -463,34 +492,32 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   expandButton: {
-    width: 24,
-    height: 24,
-    zIndex: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
+    alignSelf: 'flex-end',
   },
   expandIconCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.white,
     justifyContent: 'center',
     alignItems: 'center',
   },
   bottomArea: {
     flex: 1,
     position: 'relative',
+    overflow: 'hidden',
   },
   joystickSection: {
     alignItems: 'center',
-    paddingTop: 32,
-    paddingHorizontal: 20,
+    paddingTop: 16,
   },
   joystickSectionOpen: {
-    paddingTop: 32,
+    alignItems: 'center',
   },
   joystickGestureLayer: {
     position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   joystickShell: {
     backgroundColor: COLORS.white,
@@ -498,60 +525,42 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'relative',
   },
-  joystickKnobOverlay: {
-    position: 'absolute',
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: COLORS.lightRing,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   arrowWrapper: {
     position: 'absolute',
-  },
-  arrowUp: {
-    top: 28,
-  },
-  arrowRight: {
-    right: 28,
-  },
-  arrowDown: {
-    bottom: 28,
-  },
-  arrowLeft: {
-    left: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   centerOuterCircle: {
-    width: 104,
-    height: 104,
-    borderRadius: 52,
     backgroundColor: COLORS.lightRing,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  centerRing: {
+    borderColor: COLORS.green,
+    backgroundColor: 'transparent',
+  },
   controlsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 30,
     position: 'absolute',
     left: 0,
     right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 28,
     zIndex: 3,
   },
-  smallControl: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  smallControlButton: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: COLORS.white,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  captureButton: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
+  mainControlButton: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     backgroundColor: COLORS.white,
     justifyContent: 'center',
     alignItems: 'center',
@@ -559,47 +568,46 @@ const styles = StyleSheet.create({
   bottomSheet: {
     position: 'absolute',
     bottom: 0,
-    height: BOTTOM_SHEET_HEIGHT,
     backgroundColor: COLORS.white,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    paddingTop: 16,
-    paddingHorizontal: 16,
-    zIndex: 2,
-    overflow: 'hidden',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 24,
+    zIndex: 1,
   },
-  bottomSheetTitle: {
+  otherTitle: {
     fontFamily: 'Inter',
-    fontSize: 14,
-    lineHeight: 18,
+    fontSize: 20,
     fontWeight: '500',
-    color: '#000000',
-    marginBottom: 16,
-  },
-  bottomSheetScroll: {
-    flex: 1,
+    lineHeight: 20,
+    color: COLORS.black,
+    marginLeft: 20,
+    marginBottom: 20,
   },
   otherGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingBottom: 8,
+    alignItems: 'flex-start',
+    paddingHorizontal: 14,
+    rowGap: 16,
   },
   otherItem: {
     width: '33.3333%',
-    paddingHorizontal: 6,
-    paddingVertical: 12,
     alignItems: 'center',
+    paddingHorizontal: 6,
   },
-  otherItemImage: {
-    marginBottom: 12,
+  otherImage: {
+    marginBottom: 8,
   },
-  otherItemLabel: {
+  otherLabel: {
     fontFamily: 'Inter',
-    fontSize: 14,
-    lineHeight: 14,
+    fontSize: 12,
     fontWeight: '400',
-    color: '#000000',
+    lineHeight: 14,
+    color: COLORS.black,
     textAlign: 'center',
-    width: '100%',
   },
 });
+
+
+
+

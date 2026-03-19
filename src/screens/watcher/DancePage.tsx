@@ -5,13 +5,13 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {Svg, Path, Rect} from 'react-native-svg';
 import {useNavigation} from '@react-navigation/native';
 import {WatcherHeader} from '../../components/WatcherHeader';
+import {useResponsiveScale} from '../../hooks/useResponsiveScale';
 
 const COLORS = {
   background: '#F5F5F9',
@@ -27,34 +27,12 @@ const DEFAULT_ROBOTS = ['Watcher-01', 'Watcher-02', 'Watcher-03'] as const;
 
 export const DancePage: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const {width: windowWidth, height: windowHeight} = useWindowDimensions();
   const navigation = useNavigation();
   const [selectedTab, setSelectedTab] = React.useState<TabType>('default');
   const [selectedRobot, setSelectedRobot] = React.useState<string>('Watcher-01');
+  const {windowWidth, scaleValue, verticalScaleValue} = useResponsiveScale();
 
-  const widthScale = Math.min(Math.max(windowWidth / 393, 0.92), 1.12);
-  const heightScale = Math.min(Math.max(windowHeight / 852, 0.88), 1.1);
-  const scaleValue = (value: number, min?: number, max?: number) => {
-    const scaled = value * widthScale;
-    if (typeof min === 'number' && scaled < min) {
-      return min;
-    }
-    if (typeof max === 'number' && scaled > max) {
-      return max;
-    }
-    return scaled;
-  };
-  const verticalScaleValue = (value: number, min?: number, max?: number) => {
-    const scaled = value * heightScale;
-    if (typeof min === 'number' && scaled < min) {
-      return min;
-    }
-    if (typeof max === 'number' && scaled > max) {
-      return max;
-    }
-    return scaled;
-  };
-
+  // 页面主要尺寸按统一响应式规则换算
   const horizontalPadding = scaleValue(20, 18, 24);
   const headerSideInset = scaleValue(30, 26, 32);
   const contentWidth = windowWidth - horizontalPadding * 2;
@@ -75,6 +53,7 @@ export const DancePage: React.FC = () => {
     <View style={styles.container}>
       <View style={{height: insets.top, backgroundColor: COLORS.white}} />
 
+      {/* 公共页眉 */}
       <WatcherHeader
         title="Dance"
         onBack={() => navigation.goBack()}
@@ -95,6 +74,7 @@ export const DancePage: React.FC = () => {
         }
       />
 
+      {/* 顶部分类切换 */}
       <View
         style={[
           styles.timeBar,
@@ -137,6 +117,7 @@ export const DancePage: React.FC = () => {
         </TouchableOpacity>
       </View>
 
+      {/* 中间机器人主视觉 */}
       <View
         style={[
           styles.robotSection,
@@ -156,6 +137,7 @@ export const DancePage: React.FC = () => {
         </Text>
       </View>
 
+      {/* 底部内容卡片 */}
       <View
         style={[
           styles.bottomCard,
@@ -163,10 +145,11 @@ export const DancePage: React.FC = () => {
             marginHorizontal: horizontalPadding,
             paddingTop: bottomCardTopPadding,
           },
-        ]}>
+      ]}>
         <Text style={styles.otherTitle}>Other</Text>
 
         {selectedTab === 'default' ? (
+          /* 默认机器人列表 */
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={[
@@ -192,6 +175,7 @@ export const DancePage: React.FC = () => {
             ))}
           </ScrollView>
         ) : (
+          /* 自定义机器人列表和添加入口 */
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={[
