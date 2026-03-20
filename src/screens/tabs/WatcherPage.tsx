@@ -116,6 +116,23 @@ const LoadingSpinner: React.FC = () => {
   );
 };
 
+const FailureIcon: React.FC = () => (
+  <Svg width="100%" height="100%" viewBox="0 0 66 66" fill="none">
+    <Path
+      d="M33 66C51.2254 66 66 51.2254 66 33C66 14.7746 51.2254 0 33 0C14.7746 0 0 14.7746 0 33C0 51.2254 14.7746 66 33 66Z"
+      fill="#CFD3D8"
+    />
+    <Path
+      d="M29.7061 15C29.7061 14.4477 30.1538 14 30.7061 14H33.7061C34.2584 14 34.7061 14.4477 34.7061 15V40.379C34.7061 40.9312 34.2584 41.379 33.7061 41.379H30.7061C30.1538 41.379 29.7061 40.9312 29.7061 40.379V15Z"
+      fill="white"
+    />
+    <Path
+      d="M35.999 48.5C35.999 50.433 34.432 52 32.499 52C30.566 52 28.999 50.433 28.999 48.5C28.999 46.567 30.566 45 32.499 45C34.432 45 35.999 46.567 35.999 48.5Z"
+      fill="white"
+    />
+  </Svg>
+);
+
 export const WatcherPage: React.FC = () => {
   const insets = useSafeAreaInsets();
   const {windowWidth, scaleValue, verticalScaleValue} = useResponsiveScale();
@@ -138,6 +155,15 @@ export const WatcherPage: React.FC = () => {
   const buttonBottom = verticalScaleValue(32, 24, 38);
   const cardHeight = verticalScaleValue(116, 108, 122);
   const sectionTopPadding = verticalScaleValue(10, 8, 14);
+  const modalCardWidth = Math.min(
+    contentWidth - scaleValue(9, 0, 12),
+    scaleValue(324, 300, 332),
+  );
+  const modalCardPadding = scaleValue(30, 24, 30);
+  const modalIconSize = scaleValue(66, 60, 66);
+  const modalButtonGap = scaleValue(20, 16, 20);
+  const modalButtonHeight = verticalScaleValue(50, 46, 50);
+  const modalTextWidth = modalCardWidth - modalCardPadding * 2;
 
   useEffect(() => {
     if (route.params?.connected) {
@@ -155,16 +181,23 @@ export const WatcherPage: React.FC = () => {
     });
 
   const checkWifiReady = async () => {
+    const probeUrl = `https://www.gstatic.com/generate_204?ts=${Date.now()}`;
+
     try {
-      await Promise.race([
-        fetch('https://www.baidu.com/favicon.ico', {
+      const response = await Promise.race([
+        fetch(probeUrl, {
           method: 'GET',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, max-age=0',
+            Pragma: 'no-cache',
+          },
         }),
         wait(2500).then(() => {
           throw new Error('wifi-timeout');
         }),
       ]);
-      return true;
+
+      return Boolean(response && 'ok' in response && response.ok);
     } catch {
       return false;
     }
@@ -210,11 +243,11 @@ export const WatcherPage: React.FC = () => {
       ? {
           description:
             'Connection failed. Please turn on the Bluetooth on your mobile phone.',
-          action: 'Go now',
+          action: 'Toggle on',
         }
       : {
           description: 'Connection failed. Please turn on WIFI.',
-          action: 'Go now',
+          action: 'Toggle on',
         };
 
   const cards = [
@@ -353,25 +386,56 @@ export const WatcherPage: React.FC = () => {
         visible={failureType !== null}
         transparent
         animationType="fade"
+        statusBarTranslucent
+        navigationBarTranslucent
+        presentationStyle="overFullScreen"
         onRequestClose={() => setFailureType(null)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalIconWrap}>
-              <Text style={styles.modalIconText}>!</Text>
+        <View
+          style={[
+            styles.modalOverlay,
+            {paddingHorizontal: scaleValue(34, 24, 40)},
+          ]}>
+          <View
+            style={[
+              styles.modalCard,
+              {
+                width: modalCardWidth,
+                paddingHorizontal: modalCardPadding,
+                paddingTop: modalCardPadding,
+                paddingBottom: modalCardPadding,
+              },
+            ]}>
+            <View
+              style={[
+                styles.modalIconWrap,
+                {
+                  width: modalIconSize,
+                  height: modalIconSize,
+                },
+              ]}>
+              <FailureIcon />
             </View>
             <Text style={styles.modalTitle}>Connection Failed</Text>
-            <Text style={styles.modalDescription}>{failureCopy.description}</Text>
+            <Text
+              style={[
+                styles.modalDescription,
+                {
+                  maxWidth: Math.min(modalTextWidth, scaleValue(264, 248, 264)),
+                },
+              ]}>
+              {failureCopy.description}
+            </Text>
 
-            <View style={styles.modalActions}>
+            <View style={[styles.modalActions, {gap: modalButtonGap}]}>
               <TouchableOpacity
-                style={styles.modalSecondaryButton}
+                style={[styles.modalSecondaryButton, {height: modalButtonHeight}]}
                 activeOpacity={0.85}
                 onPress={() => setFailureType(null)}>
                 <Text style={styles.modalSecondaryText}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.modalPrimaryButton}
+                style={[styles.modalPrimaryButton, {height: modalButtonHeight}]}
                 activeOpacity={0.85}
                 onPress={() => {
                   setFailureType(null);
@@ -526,30 +590,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 34,
   },
   modalCard: {
-    width: '100%',
-    maxWidth: 324,
     backgroundColor: COLORS.white,
     borderRadius: 16,
-    paddingHorizontal: 30,
-    paddingTop: 30,
-    paddingBottom: 30,
     alignItems: 'center',
   },
   modalIconWrap: {
-    width: 66,
-    height: 66,
-    borderRadius: 33,
-    backgroundColor: '#DCE1E9',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 24,
-  },
-  modalIconText: {
-    fontFamily: 'Inter',
-    fontSize: 44,
-    lineHeight: 44,
-    fontWeight: '700',
-    color: COLORS.white,
   },
   modalTitle: {
     fontFamily: 'Inter',
@@ -567,16 +615,13 @@ const styles = StyleSheet.create({
     color: '#636A74',
     textAlign: 'center',
     marginBottom: 24,
-    maxWidth: 264,
   },
   modalActions: {
     width: '100%',
     flexDirection: 'row',
-    gap: 20,
   },
   modalSecondaryButton: {
     flex: 1,
-    height: 50,
     borderRadius: 30,
     backgroundColor: '#F5F5F9',
     justifyContent: 'center',
@@ -584,7 +629,6 @@ const styles = StyleSheet.create({
   },
   modalPrimaryButton: {
     flex: 1,
-    height: 50,
     borderRadius: 30,
     backgroundColor: COLORS.green,
     justifyContent: 'center',
@@ -593,14 +637,14 @@ const styles = StyleSheet.create({
   modalSecondaryText: {
     fontFamily: 'Inter',
     fontSize: 14,
-    lineHeight: 14,
+    lineHeight: 16,
     fontWeight: '600',
     color: COLORS.green,
   },
   modalPrimaryText: {
     fontFamily: 'Inter',
     fontSize: 14,
-    lineHeight: 14,
+    lineHeight: 16,
     fontWeight: '600',
     color: COLORS.white,
   },
