@@ -3,13 +3,16 @@ import {
   Animated,
   Easing,
   Image,
+  Linking,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import NetInfo from '@react-native-community/netinfo';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {Svg, Path} from 'react-native-svg';
 import {useNavigation, useRoute} from '@react-navigation/native';
@@ -73,43 +76,59 @@ const LoadingSpinner: React.FC = () => {
     <Animated.View style={{transform: [{rotate}]}}>
       <Svg width={14} height={14} viewBox="0 0 14 14" fill="none">
         <Path
-          d="M7 0.875C7.36244 0.875 7.65625 1.16881 7.65625 1.53125V2.84375C7.65625 3.20619 7.36244 3.5 7 3.5C6.63756 3.5 6.34375 3.20619 6.34375 2.84375V1.53125C6.34375 1.16881 6.63756 0.875 7 0.875Z"
+          opacity={0.5}
+          d="M7.06934 0.335693C7.32836 0.335693 7.55056 0.557176 7.55078 0.816162V3.10327C7.55075 3.3624 7.32847 3.58472 7.06934 3.58472C6.81037 3.58449 6.5889 3.36227 6.58887 3.10327V0.816162C6.58909 0.557306 6.81048 0.335917 7.06934 0.335693Z"
           fill="white"
+          stroke="white"
+          strokeWidth={0.2625}
         />
         <Path
-          d="M7 10.5C7.36244 10.5 7.65625 10.7938 7.65625 11.1562V12.4688C7.65625 12.8312 7.36244 13.125 7 13.125C6.63756 13.125 6.34375 12.8312 6.34375 12.4688V11.1562C6.34375 10.7938 6.63756 10.5 7 10.5Z"
+          opacity={0.6}
+          d="M2.33301 2.26318C2.52413 2.07206 2.81752 2.07232 3.00879 2.26318L4.61914 3.87354C4.8104 4.06479 4.8104 4.35806 4.61914 4.54932C4.54952 4.61894 4.42338 4.68115 4.29297 4.68115C4.1794 4.68115 4.04665 4.65261 3.94336 4.54932L2.33301 2.93896C2.14214 2.7477 2.14188 2.45431 2.33301 2.26318Z"
           fill="white"
-          fillOpacity="0.35"
+          stroke="white"
+          strokeWidth={0.2625}
         />
         <Path
-          d="M0.875 7C0.875 6.63756 1.16881 6.34375 1.53125 6.34375H2.84375C3.20619 6.34375 3.5 6.63756 3.5 7C3.5 7.36244 3.20619 7.65625 2.84375 7.65625H1.53125C1.16881 7.65625 0.875 7.36244 0.875 7Z"
+          opacity={0.7}
+          d="M3.10352 6.44922C3.36252 6.44925 3.58474 6.67072 3.58496 6.92969C3.58496 7.18882 3.36265 7.4111 3.10352 7.41113H0.816406C0.55742 7.41091 0.335938 7.18871 0.335938 6.92969C0.336161 6.67083 0.55755 6.44944 0.816406 6.44922H3.10352Z"
           fill="white"
-          fillOpacity="0.7"
+          stroke="white"
+          strokeWidth={0.2625}
         />
         <Path
-          d="M10.5 7C10.5 6.63756 10.7938 6.34375 11.1562 6.34375H12.4688C12.8312 6.34375 13.125 6.63756 13.125 7C13.125 7.36244 12.8312 7.65625 12.4688 7.65625H11.1562C10.7938 7.65625 10.5 7.36244 10.5 7Z"
+          opacity={0.8}
+          d="M3.85059 9.38013C4.04177 9.18912 4.33516 9.18914 4.52637 9.38013C4.71756 9.57132 4.71745 9.86465 4.52637 10.0559L2.91602 11.6663C2.81517 11.767 2.68463 11.7981 2.58984 11.7981C2.47635 11.798 2.34343 11.7695 2.24023 11.6663C2.04925 11.4751 2.04923 11.1817 2.24023 10.9905L3.85059 9.38013Z"
           fill="white"
-          fillOpacity="0.15"
+          stroke="white"
+          strokeWidth={0.2625}
         />
         <Path
-          d="M2.88775 2.88775C3.144 2.6315 3.5595 2.6315 3.81575 2.88775L4.74387 3.81587C5.00012 4.07212 5.00012 4.48763 4.74387 4.74387C4.48763 5.00012 4.07212 5.00012 3.81587 4.74387L2.88775 3.81575C2.6315 3.5595 2.6315 3.144 2.88775 2.88775Z"
+          opacity={0.9}
+          d="M6.92969 10.4158C7.18871 10.4158 7.41091 10.6373 7.41113 10.8962V13.1833C7.4111 13.4425 7.18882 13.6648 6.92969 13.6648C6.67072 13.6646 6.44925 13.4424 6.44922 13.1833V10.8962C6.44944 10.6374 6.67083 10.416 6.92969 10.4158Z"
           fill="white"
-          fillOpacity="0.85"
+          stroke="white"
+          strokeWidth={0.2625}
         />
         <Path
-          d="M9.25613 9.25613C9.51237 8.99988 9.92788 8.99988 10.1841 9.25613L11.1122 10.1842C11.3685 10.4405 11.3685 10.856 11.1122 11.1122C10.856 11.3685 10.4405 11.3685 10.1842 11.1122L9.25613 10.1841C8.99988 9.92788 8.99988 9.51237 9.25613 9.25613Z"
+          d="M9.35645 9.47339C9.54757 9.28226 9.84096 9.28252 10.0322 9.47339L11.6426 11.0837C11.8338 11.275 11.8338 11.5683 11.6426 11.7595C11.5554 11.8688 11.4143 11.8914 11.3164 11.8914C11.2028 11.8914 11.0701 11.8628 10.9668 11.7595L9.35645 10.1492C9.16558 9.95791 9.16532 9.66451 9.35645 9.47339Z"
           fill="white"
-          fillOpacity="0.25"
+          stroke="white"
+          strokeWidth={0.2625}
         />
         <Path
-          d="M9.25613 4.74387C8.99988 4.48763 8.99988 4.07212 9.25613 3.81587L10.1842 2.88775C10.4405 2.6315 10.856 2.6315 11.1122 2.88775C11.3685 3.144 11.3685 3.5595 11.1122 3.81575L10.1841 4.74387C9.92788 5.00012 9.51237 5.00012 9.25613 4.74387Z"
+          opacity={0.3}
+          d="M13.1836 6.58911C13.4426 6.58914 13.6648 6.81061 13.665 7.06958C13.665 7.32872 13.4427 7.551 13.1836 7.55103H10.8965C10.6375 7.5508 10.416 7.3286 10.416 7.06958C10.4162 6.81072 10.6376 6.58933 10.8965 6.58911H13.1836Z"
           fill="white"
-          fillOpacity="0.5"
+          stroke="white"
+          strokeWidth={0.2625}
         />
         <Path
-          d="M2.88775 11.1122C2.6315 10.856 2.6315 10.4405 2.88775 10.1842L3.81587 9.25613C4.07212 8.99988 4.48763 8.99988 4.74387 9.25613C5.00012 9.51237 5.00012 9.92788 4.74387 10.1841L3.81575 11.1122C3.5595 11.3685 3.144 11.3685 2.88775 11.1122Z"
+          opacity={0.4}
+          d="M11.0605 2.35669C11.2517 2.16568 11.5451 2.16571 11.7363 2.35669C11.9275 2.54789 11.9274 2.84121 11.7363 3.03247L10.126 4.64282C10.0388 4.75199 9.89761 4.77466 9.7998 4.77466C9.68631 4.7746 9.55339 4.74602 9.4502 4.64282C9.25921 4.45162 9.25919 4.15823 9.4502 3.96704L11.0605 2.35669Z"
           fill="white"
-          fillOpacity="0.6"
+          stroke="white"
+          strokeWidth={0.2625}
         />
       </Svg>
     </Animated.View>
@@ -133,6 +152,15 @@ const FailureIcon: React.FC = () => (
   </Svg>
 );
 
+const DeviceMenuArrow: React.FC = () => (
+  <Svg width={8} height={9} viewBox="0 0 8 9" fill="none">
+    <Path
+      d="M7.5 3.59955C8.16667 3.98445 8.16667 4.9467 7.5 5.3316L1.5 8.7957C0.833334 9.1806 1.22038e-07 8.69948 1.12858e-07 7.92968L3.02403e-08 1.00148C2.10605e-08 0.231675 0.833333 -0.249451 1.5 0.135449L7.5 3.59955Z"
+      fill="#363C44"
+    />
+  </Svg>
+);
+
 export const WatcherPage: React.FC = () => {
   const insets = useSafeAreaInsets();
   const {windowWidth, scaleValue, verticalScaleValue} = useResponsiveScale();
@@ -141,6 +169,8 @@ export const WatcherPage: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [failureType, setFailureType] = useState<FailureType>(null);
+  const [selectedDevice, setSelectedDevice] = useState('Watcher-01');
+  const [showDeviceMenu, setShowDeviceMenu] = useState(false);
 
   // 页面主要尺寸按统一响应式规则换算
   const horizontalPadding = scaleValue(20, 18, 24);
@@ -164,12 +194,18 @@ export const WatcherPage: React.FC = () => {
   const modalButtonGap = scaleValue(20, 16, 20);
   const modalButtonHeight = verticalScaleValue(50, 46, 50);
   const modalTextWidth = modalCardWidth - modalCardPadding * 2;
+  const deviceMenuWidth = scaleValue(130, 124, 130);
+  const deviceMenuTop =
+    insets.top + sectionTopPadding + verticalScaleValue(54, 48, 58);
+  const deviceMenuLeft = horizontalPadding + scaleValue(14, 12, 16);
+  const headerTitleInset = scaleValue(8, 6, 10);
 
   useEffect(() => {
     if (route.params?.connected) {
       setFailureType(null);
       setIsConnecting(false);
       setIsConnected(true);
+      setShowDeviceMenu(false);
       navigation.setParams({connected: undefined});
     }
   }, [navigation, route.params?.connected]);
@@ -181,25 +217,31 @@ export const WatcherPage: React.FC = () => {
     });
 
   const checkWifiReady = async () => {
-    const probeUrl = `https://www.gstatic.com/generate_204?ts=${Date.now()}`;
-
     try {
-      const response = await Promise.race([
-        fetch(probeUrl, {
-          method: 'GET',
-          headers: {
-            'Cache-Control': 'no-cache, no-store, max-age=0',
-            Pragma: 'no-cache',
-          },
-        }),
-        wait(2500).then(() => {
-          throw new Error('wifi-timeout');
-        }),
-      ]);
-
-      return Boolean(response && 'ok' in response && response.ok);
+      const netState = await NetInfo.fetch();
+      return netState.type === 'wifi' && netState.isConnected !== false;
     } catch {
       return false;
+    }
+  };
+
+  const openFailureSettings = async () => {
+    try {
+      if (Platform.OS === 'android') {
+        if (failureType === 'wifi') {
+          await Linking.sendIntent('android.settings.WIFI_SETTINGS');
+          return;
+        }
+
+        if (failureType === 'bluetooth') {
+          await Linking.sendIntent('android.settings.BLUETOOTH_SETTINGS');
+          return;
+        }
+      }
+
+      await Linking.openSettings();
+    } catch {
+      await Linking.openSettings();
     }
   };
 
@@ -210,6 +252,7 @@ export const WatcherPage: React.FC = () => {
 
     if (isConnected) {
       setIsConnected(false);
+      setShowDeviceMenu(false);
       return;
     }
 
@@ -259,6 +302,14 @@ export const WatcherPage: React.FC = () => {
 
   return (
     <View style={[styles.container, {paddingTop: insets.top + sectionTopPadding}]}>
+      {showDeviceMenu ? (
+        <TouchableOpacity
+          style={styles.deviceMenuBackdrop}
+          activeOpacity={1}
+          onPress={() => setShowDeviceMenu(false)}
+        />
+      ) : null}
+
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={[
@@ -271,12 +322,22 @@ export const WatcherPage: React.FC = () => {
         showsVerticalScrollIndicator={false}>
         {/* 顶部标题和通知入口 */}
         <View style={[styles.header, {marginBottom: headerBottom}]}>
-          <View style={styles.headerLeft}>
+          <TouchableOpacity
+            style={[styles.headerLeft, {paddingLeft: headerTitleInset}]}
+            activeOpacity={isConnected ? 0.8 : 1}
+            disabled={!isConnected}
+            onPress={() => setShowDeviceMenu(prev => !prev)}>
             <Text style={styles.headerTitle}>
               Wat<Text style={{color: COLORS.green}}>c</Text>her
             </Text>
-            <View style={styles.triangleIcon} />
-          </View>
+            <View
+              style={[
+                styles.triangleIcon,
+                showDeviceMenu && styles.triangleIconOpen,
+              ]}>
+              <DeviceMenuArrow />
+            </View>
+          </TouchableOpacity>
 
           <TouchableOpacity style={styles.bellButton} activeOpacity={0.8}>
             <Svg width={18} height={18} viewBox="0 0 14 16" fill="none">
@@ -382,6 +443,56 @@ export const WatcherPage: React.FC = () => {
         </View>
       </ScrollView>
 
+      {showDeviceMenu ? (
+        <View
+          style={[
+            styles.deviceMenu,
+            {
+              width: deviceMenuWidth,
+              top: deviceMenuTop,
+              left: deviceMenuLeft,
+            },
+          ]}>
+          <TouchableOpacity
+            style={[
+              styles.deviceMenuSelected,
+              selectedDevice !== 'Watcher-01' && styles.deviceMenuPlain,
+            ]}
+            activeOpacity={0.85}
+            onPress={() => {
+              setSelectedDevice('Watcher-01');
+              setShowDeviceMenu(false);
+            }}>
+            <Text style={styles.deviceMenuSelectedText}>Watcher-01</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.deviceMenuItem,
+              selectedDevice === 'Watcher-02' && styles.deviceMenuSelectedAlt,
+            ]}
+            activeOpacity={0.85}
+            onPress={() => {
+              setSelectedDevice('Watcher-02');
+              setShowDeviceMenu(false);
+            }}>
+            <Text style={styles.deviceMenuItemText}>Watcher-02</Text>
+          </TouchableOpacity>
+
+          <View style={styles.deviceMenuDivider} />
+
+          <TouchableOpacity
+            style={styles.deviceMenuItem}
+            activeOpacity={0.85}
+            onPress={() => {
+              setShowDeviceMenu(false);
+              navigation.navigate('BindingGuide');
+            }}>
+            <Text style={styles.deviceMenuAddText}>Add a new robot</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
       <Modal
         visible={failureType !== null}
         transparent
@@ -437,9 +548,9 @@ export const WatcherPage: React.FC = () => {
               <TouchableOpacity
                 style={[styles.modalPrimaryButton, {height: modalButtonHeight}]}
                 activeOpacity={0.85}
-                onPress={() => {
+                onPress={async () => {
                   setFailureType(null);
-                  navigation.navigate('BindingGuide');
+                  await openFailureSettings();
                 }}>
                 <Text style={styles.modalPrimaryText}>{failureCopy.action}</Text>
               </TouchableOpacity>
@@ -482,21 +593,93 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
   triangleIcon: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: 6,
-    borderRightWidth: 6,
-    borderTopWidth: 10,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderTopColor: COLORS.grayIcon,
-    transform: [{rotate: '-90deg'}],
+    width: 8,
+    height: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    transform: [{rotate: '0deg'}],
+  },
+  triangleIconOpen: {
+    transform: [{rotate: '90deg'}],
   },
   bellButton: {
     width: 44,
     height: 44,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  deviceMenuBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 2,
+  },
+  deviceMenu: {
+    position: 'absolute',
+    zIndex: 3,
+    minHeight: 120,
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    padding: 12,
+    shadowColor: '#000000',
+    shadowOpacity: 0.025,
+    shadowRadius: 5.2,
+    shadowOffset: {width: 0, height: 4},
+    elevation: 3,
+  },
+  deviceMenuSelected: {
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: '#F5F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+  },
+  deviceMenuPlain: {
+    backgroundColor: 'transparent',
+  },
+  deviceMenuSelectedText: {
+    fontFamily: 'Inter',
+    fontSize: 12,
+    lineHeight: 12,
+    fontWeight: '500',
+    color: COLORS.black,
+    textAlign: 'center',
+  },
+  deviceMenuItem: {
+    minHeight: 26,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingTop: 8,
+  },
+  deviceMenuSelectedAlt: {
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: '#F5F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingTop: 0,
+  },
+  deviceMenuItemText: {
+    fontFamily: 'Inter',
+    fontSize: 12,
+    lineHeight: 12,
+    fontWeight: '500',
+    color: COLORS.black,
+    textAlign: 'center',
+  },
+  deviceMenuDivider: {
+    marginTop: 8,
+    height: 1,
+    backgroundColor: '#F1F2F4',
+  },
+  deviceMenuAddText: {
+    fontFamily: 'Inter',
+    fontSize: 12,
+    lineHeight: 12,
+    fontWeight: '400',
+    color: '#8E959F',
+    textAlign: 'center',
   },
   heroSection: {
     alignSelf: 'center',

@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
   },
   headerContent: {
     width: '100%',
-    height: 24,
+    minHeight: 26,
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontFamily: 'SF Pro',
     fontSize: 18,
-    lineHeight: 18,
+    lineHeight: 22,
     fontWeight: '500',
     color: '#1A1A1A',
     textAlign: 'center',

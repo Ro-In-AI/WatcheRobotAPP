@@ -12,7 +12,7 @@ import {
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import Svg, {Circle, Path} from 'react-native-svg';
+import Svg, {Path} from 'react-native-svg';
 import {WatcherHeader} from '../../components/WatcherHeader';
 import {useResponsiveScale} from '../../hooks/useResponsiveScale';
 import type {WatcherStackParamList} from '../../navigation/AppNavigator';
@@ -48,55 +48,35 @@ const wifiOptions = [
 const WifiIcon: React.FC<{active?: boolean}> = ({active = false}) => (
   <Svg width={16} height={16} viewBox="0 0 16 16" fill="none">
     <Path
-      d="M1.99805 5.99967C5.45793 2.85407 10.5408 2.85407 14.0007 5.99967"
-      stroke={active ? COLORS.green : '#000000'}
-      strokeWidth="1.6"
-      strokeLinecap="round"
+      d="M0 5.513L1.455 7.056C5.069 3.221 10.931 3.221 14.545 7.056L16 5.513C11.585 0.829 4.422 0.829 0 5.513ZM5.818 11.685L8 14L10.182 11.685C8.982 10.405 7.025 10.405 5.818 11.685ZM2.91 8.6L4.365 10.143C6.372 8.013 9.63 8.013 11.637 10.143L13.091 8.6C10.284 5.622 5.724 5.622 2.909 8.6H2.91Z"
+      fill={active ? COLORS.green : '#000000'}
     />
-    <Path
-      d="M4.33398 8.33333C6.4936 6.42619 9.50706 6.42619 11.6667 8.33333"
-      stroke={active ? COLORS.green : '#000000'}
-      strokeWidth="1.6"
-      strokeLinecap="round"
-    />
-    <Path
-      d="M6.66602 10.6663C7.46233 10.0184 8.5377 10.0184 9.33402 10.6663"
-      stroke={active ? COLORS.green : '#000000'}
-      strokeWidth="1.6"
-      strokeLinecap="round"
-    />
-    <Circle cx="8.00065" cy="13.0007" r="1.33333" fill={active ? COLORS.green : '#000000'} />
   </Svg>
 );
 
 const RefreshIcon: React.FC = () => (
   <Svg width={16} height={16} viewBox="0 0 16 16" fill="none">
     <Path
-      d="M13.3333 8.00004C13.3333 10.9456 10.9455 13.3334 7.99996 13.3334C5.89046 13.3334 4.06706 12.1088 3.20044 10.3334"
-      stroke="#63728A"
-      strokeWidth="1.4"
-      strokeLinecap="round"
+      d="M4.16967 2.53792C4.20434 2.51659 4.23634 2.49592 4.26501 2.47659C5.36718 1.7298 6.66833 1.33146 7.99967 1.33326C11.6817 1.33326 14.6663 4.31792 14.6663 7.99992C14.6682 9.24711 14.3186 10.4696 13.6577 11.5273C13.6379 11.5589 13.6102 11.5847 13.5773 11.6024C13.5445 11.62 13.5076 11.6288 13.4703 11.6279C13.4331 11.6269 13.3967 11.6163 13.3648 11.597C13.3329 11.5777 13.3065 11.5505 13.2883 11.5179L11.6083 8.49526C11.5801 8.44452 11.5657 8.38729 11.5664 8.32923C11.5671 8.27118 11.5829 8.21431 11.6123 8.16427C11.6418 8.11422 11.6838 8.07274 11.7342 8.04391C11.7846 8.01508 11.8416 7.99992 11.8997 7.99992H13.333C13.3332 7.01395 13.0601 6.0472 12.544 5.20709C12.0279 4.36697 11.289 3.68636 10.4094 3.24086C9.52984 2.79537 8.54397 2.60242 7.56133 2.68346C6.57868 2.7645 5.63774 3.11635 4.84301 3.69992C4.77484 3.74994 4.69682 3.78488 4.61411 3.80242C4.5314 3.81996 4.44591 3.81971 4.36331 3.80168C4.28071 3.78364 4.20289 3.74824 4.13503 3.69783C4.06716 3.64741 4.01079 3.58313 3.96967 3.50926L3.93234 3.44259C3.84783 3.29024 3.82534 3.11117 3.86955 2.94265C3.91376 2.77414 4.02126 2.62917 4.16967 2.53792ZM11.7397 13.5199C10.6364 14.269 9.33319 14.6686 7.99967 14.6666C4.31767 14.6666 1.33301 11.6819 1.33301 7.99992C1.33301 6.75059 1.67701 5.58126 2.27434 4.58192C2.30013 4.53867 2.33685 4.50298 2.38082 4.47844C2.42479 4.45389 2.47444 4.44136 2.52479 4.4421C2.57514 4.44284 2.62441 4.45684 2.66763 4.48267C2.71085 4.5085 2.74651 4.54527 2.77101 4.58926L4.39101 7.50459C4.41922 7.55533 4.4337 7.61256 4.433 7.67062C4.4323 7.72867 4.41644 7.78554 4.38701 7.83558C4.35758 7.88563 4.31558 7.92711 4.26518 7.95594C4.21479 7.98477 4.15773 7.99993 4.09967 7.99992H2.66634C2.66632 8.98624 2.9398 9.95323 3.4564 10.7934C3.97299 11.6336 4.71245 12.3141 5.5926 12.7593C6.47274 13.2044 7.45908 13.3968 8.442 13.315C9.42491 13.2332 10.3659 12.8804 11.1603 12.2959C11.2303 12.2437 11.3104 12.2068 11.3955 12.1875C11.4806 12.1683 11.5688 12.1671 11.6544 12.184C11.74 12.201 11.821 12.2358 11.8923 12.286C11.9636 12.3363 12.0236 12.401 12.0683 12.4759C12.1652 12.6378 12.195 12.8311 12.1512 13.0146C12.1075 13.198 11.9938 13.3572 11.8343 13.4579C11.8029 13.4779 11.7718 13.4983 11.741 13.5193L11.7397 13.5199Z"
+      fill="#5D6E7F"
     />
+  </Svg>
+);
+
+const HiddenPasswordIcon: React.FC = () => (
+  <Svg width={15} height={7} viewBox="0 0 15 7" fill="none">
     <Path
-      d="M2.66667 8.00004C2.66667 5.05452 5.05448 2.66671 8 2.66671C10.1095 2.66671 11.9329 3.89129 12.7995 5.66671"
-      stroke="#63728A"
-      strokeWidth="1.4"
-      strokeLinecap="round"
+      d="M13.7964 1.004C13.8642 0.901827 13.892 0.778192 13.8743 0.656824C13.8565 0.535457 13.7946 0.424909 13.7004 0.3464C13.597 0.270148 13.468 0.237187 13.3408 0.254514C13.2135 0.271841 13.098 0.338092 13.0188 0.4392C12.9948 0.4624 10.2924 3.5416 7.06758 3.5416C3.94758 3.5416 1.11638 0.4392 1.09238 0.416C1.00451 0.325596 0.886373 0.27079 0.760603 0.262081C0.634833 0.253372 0.510271 0.291371 0.410779 0.3688C0.317572 0.450037 0.260232 0.564805 0.251242 0.688118C0.242252 0.811431 0.28234 0.933303 0.362779 1.0272C0.410779 1.0976 0.996378 1.7312 1.92678 2.4352L0.683579 3.6824C0.639748 3.72597 0.605408 3.77815 0.582718 3.83563C0.560027 3.89312 0.549477 3.95469 0.551731 4.01645C0.553985 4.07821 0.568995 4.13884 0.595816 4.19452C0.622636 4.25021 0.660688 4.29974 0.707579 4.34C0.755579 4.4328 0.875579 4.4792 0.995579 4.4792C1.12408 4.47738 1.24729 4.42776 1.34118 4.34L2.68118 3.0008C3.3706 3.46409 4.11706 3.83625 4.90198 4.108L4.38918 5.7784C4.31638 6.0344 4.46118 6.2976 4.73318 6.368H4.87878C4.98505 6.37017 5.0889 6.33611 5.17323 6.2714C5.25757 6.2067 5.31736 6.11521 5.34278 6.012L5.85638 4.34C6.25862 4.41416 6.66657 4.45298 7.07558 4.456C7.48459 4.45299 7.89254 4.41417 8.29478 4.34L8.80838 5.988C8.85638 6.1976 9.07238 6.344 9.27318 6.344C9.32118 6.344 9.36918 6.344 9.39318 6.3216C9.51906 6.289 9.62692 6.20789 9.69318 6.096C9.72512 6.04161 9.74558 5.98125 9.75328 5.91864C9.76099 5.85603 9.75578 5.79251 9.73798 5.732L9.22518 4.084C10.014 3.8128 10.7612 3.4408 11.4468 2.9784L12.762 4.2936C12.8189 4.34793 12.888 4.38799 12.9634 4.41051C13.0388 4.43303 13.1185 4.43736 13.1959 4.42316C13.2733 4.40895 13.3463 4.37661 13.4088 4.32879C13.4713 4.28096 13.5216 4.21901 13.5556 4.148C13.5943 4.06429 13.6073 3.971 13.5931 3.87989C13.5788 3.78878 13.538 3.70392 13.4756 3.636L12.2332 2.3888C12.8023 1.98451 13.3267 1.52055 13.7972 1.0048L13.7964 1.004Z"
+      fill="#BABFC4"
+      stroke="#BABFC4"
+      strokeWidth="0.5"
     />
-    <Path
-      d="M11.7334 5.73334H12.8001V4.66667"
-      stroke="#63728A"
-      strokeWidth="1.4"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <Path
-      d="M4.2666 10.2667H3.19993V11.3334"
-      stroke="#63728A"
-      strokeWidth="1.4"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
+  </Svg>
+);
+
+const PasswordDot: React.FC = () => (
+  <Svg width={4} height={4} viewBox="0 0 4 4" fill="none">
+    <Path d="M4 2C4 3.10457 3.10457 4 2 4C0.89543 4 0 3.10457 0 2C0 0.89543 0.89543 0 2 0C3.10457 0 4 0.89543 4 2Z" fill="#000000" />
   </Svg>
 );
 
@@ -146,9 +126,9 @@ export const WifiSelectPage: React.FC = () => {
   const sideInset = scaleValue(30, 24, 30);
   const cardTop = verticalScaleValue(13, 10, 16);
   const rowHeight = verticalScaleValue(48, 44, 48);
-  const sheetHeight = verticalScaleValue(304, 286, 304);
-  const sheetCardTop = verticalScaleValue(24, 20, 24);
-  const sheetActionTop = verticalScaleValue(32, 28, 32);
+  const sheetHeight = verticalScaleValue(320, 300, 320);
+  const sheetCardTop = verticalScaleValue(20, 16, 20);
+  const sheetActionTop = verticalScaleValue(28, 24, 28);
   const successCardWidth = Math.min(contentWidth, scaleValue(324, 304, 330));
 
   const handleWifiPress = (wifiName: string) => {
@@ -294,15 +274,24 @@ export const WifiSelectPage: React.FC = () => {
                 </Text>
 
                 <View style={styles.inputWrap}>
+                  {password.length === 0 ? (
+                    <View style={styles.passwordDots}>
+                      {Array.from({length: 8}).map((_, index) => (
+                        <PasswordDot key={index} />
+                      ))}
+                    </View>
+                  ) : null}
                   <TextInput
                     value={password}
                     onChangeText={setPassword}
-                    placeholder="........"
+                    placeholder=""
                     placeholderTextColor="#000000"
                     secureTextEntry
                     style={styles.passwordInput}
                   />
-                  <Text style={styles.eyeHint}>••</Text>
+                  <View style={styles.eyeHint}>
+                    <HiddenPasswordIcon />
+                  </View>
                 </View>
 
                 <View style={[styles.sheetActions, {marginTop: sheetActionTop}]}>
@@ -494,9 +483,20 @@ const styles = StyleSheet.create({
     color: COLORS.black,
     paddingVertical: 0,
   },
+  passwordDots: {
+    position: 'absolute',
+    left: 12,
+    right: 36,
+    height: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   eyeHint: {
-    fontSize: 12,
-    color: '#B3B7BD',
+    width: 15,
+    height: 7,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   sheetActions: {
     flexDirection: 'row',

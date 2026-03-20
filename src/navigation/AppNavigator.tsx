@@ -50,9 +50,9 @@ const COLORS = {
 
 const TAB_CONFIG = [
   {label: 'Watcher', icon: WatcherIcon},
-  {label: 'Nearby', icon: NearbyIcon},
-  {label: 'Moments', icon: MomentsIcon},
-  {label: 'User', icon: UserIcon},
+  {label: 'Nearby', icon: NearbyIcon, size: 21},
+  {label: 'Moments', icon: MomentsIcon, size: 19},
+  {label: 'User', icon: UserIcon, size: 19},
 ];
 
 const CustomTabBar: React.FC<any> = props => {
@@ -107,7 +107,7 @@ const CustomTabBar: React.FC<any> = props => {
               <View style={styles.tabContent}>
                 <IconComponent
                   color={isFocused ? COLORS.active : COLORS.inactive}
-                  size={20}
+                  size={tabConfig.size ?? 20}
                 />
                 <Text
                   style={[

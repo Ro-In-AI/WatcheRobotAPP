@@ -60,7 +60,7 @@ export const BindingGuidePage: React.FC = () => {
   const cardWidth = Math.min(contentWidth, scaleValue(353, 326, 360));
   const sideInset = scaleValue(30, 24, 30);
   const titleTop = verticalScaleValue(12, 10, 14);
-  const titleBlockHeight = verticalScaleValue(28, 26, 30);
+  const titleBlockHeight = verticalScaleValue(32, 30, 34);
   const cardTop = verticalScaleValue(32, 28, 36);
   const cardPaddingX = scaleValue(16, 14, 18);
   const cardPaddingY = verticalScaleValue(16, 14, 18);
@@ -204,7 +204,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     fontFamily: 'Inter',
     fontSize: 24,
-    lineHeight: 24,
+    lineHeight: 28,
     fontWeight: '700',
     color: COLORS.title,
   },

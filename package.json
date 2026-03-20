@@ -34,6 +34,7 @@
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.1.2",
+    "@react-native-community/netinfo": "^12.0.1",
     "@react-native-community/slider": "^5.1.2",
     "@react-native/new-app-screen": "0.84.1",
     "@react-navigation/bottom-tabs": "^7.15.5",
@@ -50,6 +51,7 @@
     "react-native-shadow-2": "^7.1.2",
     "react-native-svg": "^15.15.3",
     "react-native-vector-icons": "^10.3.0",
+    "react-native-vision-camera": "^4.7.3",
     "react-redux": "^9.2.0"
   },
   "devDependencies": {
