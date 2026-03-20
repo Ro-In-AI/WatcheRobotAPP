@@ -1,97 +1,194 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# WatcherRobotAPP
 
-# Getting Started
+<p align="center">
+  <img src="./icon.png" alt="Watcher Robot Logo" width="128" height="128" />
+</p>
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+<p align="center">
+  <a href="https://github.com/watcher-robot/watcher-robot-app">
+    <img src="https://img.shields.io/github/license/watcher-robot/watcher-robot-app?style=flat-square" alt="GPL-3.0 License" />
+  </a>
+  <a href="https://github.com/watcher-robot/watcher-robot-app/stargazers">
+    <img src="https://img.shields.io/github/stars/watcher-robot/watcher-robot-app?style=flat-square" alt="Stars" />
+  </a>
+  <a href="https://github.com/watcher-robot/watcher-robot-app/issues">
+    <img src="https://img.shields.io/github/issues/watcher-robot/watcher-robot-app?style=flat-square" alt="Issues" />
+  </a>
+  <a href="https://reactnative.dev">
+    <img src="https://img.shields.io/badge/React%20Native-0.84.1-61DAFB?style=flat-square&logo=react" alt="React Native" />
+  </a>
+</p>
 
-## Step 1: Start Metro
+> A React Native application for controlling dual-axis robot (Watcher Robot) via Bluetooth Low Energy (BLE).
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+[English](./README.md) | [中文](./README_zh.md)
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+## Features
 
-```sh
-# Using npm
+- **Bluetooth Connection** - Scan and connect to Watcher Robot via BLE
+- **Manual Control** - Joystick and directional control for real-time robot manipulation
+- **Motion Playback** - Play pre-defined actions or custom Blender animations
+- **Dance Programming** - Program custom dance sequences with motion combinations
+
+## Demo Screenshots
+
+| Bluetooth | Control | Motion | Dance |
+|-----------|---------|--------|-------|
+| ![Bluetooth](./docs/images/bluetooth.png) | ![Control](./docs/images/control.png) | ![Motion](./docs/images/motion.png) | ![Dance](./docs/images/dance.png) |
+
+## Technical Stack
+
+- **Framework**: React Native 0.84.1
+- **Language**: TypeScript
+- **State Management**: Redux Toolkit + React Redux
+- **Navigation**: React Navigation (Bottom Tabs)
+- **Bluetooth**: react-native-ble-plx
+- **Storage**: @react-native-async-storage/async-storage
+
+## Quick Start
+
+### Prerequisites
+
+- Node.js >= 22.11.0
+- React Native CLI
+- Android Studio / Xcode (for iOS)
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/watcher-robot/watcher-robot-app.git
+cd watcher-robot-app
+
+# Install dependencies
+npm install
+# or
+yarn install
+
+# Install iOS pods (iOS only)
+cd ios && pod install && cd ..
+```
+
+### Running
+
+```bash
+# Start Metro bundler
 npm start
-
-# OR using Yarn
+# or
 yarn start
-```
 
-## Step 2: Build and run your app
-
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
-
-```sh
-# Using npm
+# Run on Android
 npm run android
-
-# OR using Yarn
+# or
 yarn android
-```
 
-### iOS
-
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
-
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
-```sh
-bundle install
-```
-
-Then, and every time you update your native dependencies, run:
-
-```sh
-bundle exec pod install
-```
-
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
-
-```sh
-# Using npm
+# Run on iOS
 npm run ios
-
-# OR using Yarn
+# or
 yarn ios
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+## BLE Communication Protocol
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+### Service UUID
 
-## Step 3: Modify your app
+| UUID | Name | Description |
+|------|------|-------------|
+| `0000FF00-0000-1000-8000-00805F9B34FB` | SERVICE_UUID | Main BLE Service |
 
-Now that you have successfully run the app, let's make changes!
+### Characteristics
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+| UUID | Name | Direction | Description |
+|------|------|-----------|-------------|
+| `0000FF01-0000-1000-8000-00805F9B34FB` | SERVO_CTRL | Write | Servo motor control |
+| `0000FF02-0000-1000-8000-00805F9B34FB` | ACTION_CTRL | Write | Pre-defined action control |
+| `0000FF03-0000-1000-8000-00805F9B34FB` | RESPONSE | Notify | Device response |
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+### Command Reference
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+| Command | Format | Description |
+|---------|--------|-------------|
+| `SET_SERVO` | `SET_SERVO:<servoId>:<angle>` | Set servo angle immediately |
+| `SERVO_MOVE` | `SERVO_MOVE:<servoId>:<direction>` | Continuous movement (for joystick) |
+| `PLAY_ACTION` | `PLAY_ACTION:<actionId>` | Play pre-defined action (0-1) |
+| `QUEUE_ADD` | `QUEUE_ADD:<servoId>:<angle>:<duration>` | Add command to queue |
+| `QUEUE_CLEAR` | `QUEUE_CLEAR` | Clear command queue |
+| `QUEUE_START` | `QUEUE_START` | Start executing queue |
 
-## Congratulations! :tada:
+### Servo Configuration
 
-You've successfully run and modified your React Native App. :partying_face:
+| Property | Value | Description |
+|----------|-------|-------------|
+| SERVO_X | 0 | Base axis (GPIO 12) |
+| SERVO_Y | 1 | Head axis (GPIO 15) |
+| ANGLE_MIN_X | 30° | X-axis minimum angle |
+| ANGLE_MAX_X | 150° | X-axis maximum angle |
+| ANGLE_MIN_Y | 95° | Y-axis minimum angle |
+| ANGLE_MAX_Y | 150° | Y-axis maximum angle |
+| DEFAULT_ANGLE | 90° | Default center angle |
 
-### Now what?
+## Project Structure
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
+```
+src/
+├── modules/
+│   ├── bluetooth/           # BLE functionality
+│   │   ├── components/      # UI components
+│   │   ├── config/         # Configuration files
+│   │   ├── constants/      # BLE constants
+│   │   ├── hooks/         # Custom hooks
+│   │   ├── screens/       # Bluetooth screen
+│   │   ├── services/      # Business logic
+│   │   ├── store/        # Redux store
+│   │   └── types/        # TypeScript types
+│   └── app-text/          # Localization
+├── screens/                # Page components
+├── navigation/             # Navigation configuration
+├── types/                  # Global TypeScript types
+├── utils/                  # Utility functions
+└── assets/                 # Animation JSON files
+```
 
-# Troubleshooting
+## Adding Custom Animations
 
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
+1. Export animation from Blender as JSON (watcher animation format)
+2. Place JSON file in `src/assets/`
+3. Import and add to animation list in `MotionPage.tsx`:
 
-# Learn More
+```typescript
+import myAnimationJson from '../assets/my_animation.json';
 
-To learn more about React Native, take a look at the following resources:
+const ANIMATIONS = [
+  { id: 'my_animation', name: 'My Animation', json: myAnimationJson },
+];
+```
 
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+## Related Projects
+
+- [watcher-robot-firmware](https://github.com/watcher-robot/watcher-robot-firmware) - ESP32 firmware for Watcher Robot
+
+## Contributing
+
+Contributions are welcome! Please read our [Contributing Guide](./CONTRIBUTING.md) first.
+
+## License
+
+This project is licensed under the **GNU General Public License v3.0 (GPL-3.0)**.
+
+See [LICENSE](./LICENSE) file for details.
+
+```
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+```
+
+---
+
+<p align="center">Made with ❤️ for the open source community</p>
