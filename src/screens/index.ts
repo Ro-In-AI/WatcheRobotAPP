@@ -12,6 +12,7 @@ export { AnimationPage } from './watcher/AnimationPage';
 export { BindingGuidePage } from './watcher/BindingGuidePage';
 export { ScanCodePage } from './watcher/ScanCodePage';
 export { WifiSelectPage } from './watcher/WifiSelectPage';
+export { NotificationPage } from './watcher/NotificationPage';
 
 // Legacy pages (old versions, kept for reference)
 export { OldBluetoothPage } from './legacy/OldBluetoothPage';

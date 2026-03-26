@@ -12,6 +12,7 @@ import {
   DancePage,
   MomentsPage,
   MotionPage,
+  NotificationPage,
   NearbyPage,
   ScanCodePage,
   SurveillancePage,
@@ -29,6 +30,7 @@ export type WatcherStackParamList = {
   BindingGuide: undefined;
   ScanCode: undefined;
   WifiSelect: undefined;
+  Notification: undefined;
 };
 
 export type RootTabParamList = {
@@ -47,6 +49,7 @@ export type RootStackParamList = {
   BindingGuide: undefined;
   ScanCode: undefined;
   WifiSelect: undefined;
+  Notification: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -154,6 +157,7 @@ export const AppNavigator: React.FC = () => {
         <Stack.Screen name="BindingGuide" component={BindingGuidePage} />
         <Stack.Screen name="ScanCode" component={ScanCodePage} />
         <Stack.Screen name="WifiSelect" component={WifiSelectPage} />
+        <Stack.Screen name="Notification" component={NotificationPage} />
       </Stack.Navigator>
     </NavigationContainer>
   );

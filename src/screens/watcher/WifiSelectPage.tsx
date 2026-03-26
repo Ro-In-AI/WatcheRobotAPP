@@ -125,12 +125,17 @@ export const WifiSelectPage: React.FC = () => {
   const {scaleValue, verticalScaleValue, windowWidth} = useResponsiveScale();
   const visiblePasswordInputRef = useRef<TextInput>(null);
   const hiddenPasswordInputRef = useRef<TextInput>(null);
+  const refreshFrameRef = useRef<number | null>(null);
+  const refreshStartTimeRef = useRef<number | null>(null);
   const [selectedWifi, setSelectedWifi] = useState<string | null>(null);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [passwordKeyboardOffset, setPasswordKeyboardOffset] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [wifiList, setWifiList] = useState(wifiOptions);
+  const [refreshAngle, setRefreshAngle] = useState(0);
   const passwordOverlayOpacity = useRef(new Animated.Value(0)).current;
   const passwordSheetTranslateY = useRef(new Animated.Value(28)).current;
   const successOverlayOpacity = useRef(new Animated.Value(0)).current;
@@ -160,6 +165,54 @@ export const WifiSelectPage: React.FC = () => {
   const handleConfirmPassword = () => {
     setShowPasswordModal(false);
     setShowSuccessModal(true);
+  };
+
+  const handleRefresh = () => {
+    if (isRefreshing) {
+      return;
+    }
+
+    setIsRefreshing(true);
+    setRefreshAngle(0);
+    refreshStartTimeRef.current = null;
+
+    const duration = 760;
+    const easeInOutQuad = (progress: number) =>
+      progress < 0.5
+        ? 2 * progress * progress
+        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+    const animateRefresh = (timestamp: number) => {
+      if (refreshStartTimeRef.current === null) {
+        refreshStartTimeRef.current = timestamp;
+      }
+
+      const elapsed = timestamp - refreshStartTimeRef.current;
+      const progress = Math.min(elapsed / duration, 1);
+      const easedProgress = easeInOutQuad(progress);
+
+      setRefreshAngle(360 * easedProgress);
+
+      if (progress < 1) {
+        refreshFrameRef.current = requestAnimationFrame(animateRefresh);
+        return;
+      }
+
+      setWifiList(current => {
+        if (current.length <= 1) {
+          return current;
+        }
+
+        const [first, ...rest] = current;
+        return [...rest, first];
+      });
+      setRefreshAngle(0);
+      setIsRefreshing(false);
+      refreshFrameRef.current = null;
+      refreshStartTimeRef.current = null;
+    };
+
+    refreshFrameRef.current = requestAnimationFrame(animateRefresh);
   };
 
   const handleTogglePasswordVisibility = () => {
@@ -256,6 +309,9 @@ export const WifiSelectPage: React.FC = () => {
     });
 
     return () => {
+      if (refreshFrameRef.current !== null) {
+        cancelAnimationFrame(refreshFrameRef.current);
+      }
       showSubscription.remove();
       hideSubscription.remove();
     };
@@ -306,14 +362,28 @@ export const WifiSelectPage: React.FC = () => {
           ]}>
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle}>Select Wi-Fi</Text>
-            <View style={styles.refreshIconWrap}>
-              <RefreshIcon />
-            </View>
+            <TouchableOpacity
+              style={[
+                styles.refreshIconWrap,
+                isRefreshing && styles.refreshIconWrapActive,
+              ]}
+              activeOpacity={0.75}
+              onPress={handleRefresh}
+              disabled={isRefreshing}>
+              <Animated.View
+                style={[
+                  styles.refreshIconInner,
+                  {transform: [{rotate: `${refreshAngle}deg`}]},
+                  isRefreshing && styles.refreshIconInnerRefreshing,
+                ]}>
+                <RefreshIcon />
+              </Animated.View>
+            </TouchableOpacity>
           </View>
           <Text style={styles.cardSubtitle}>Only supports 2.4GHz Wi-Fi</Text>
 
           <View style={styles.listWrap}>
-            {wifiOptions.map((wifiName, index) => {
+            {wifiList.map((wifiName, index) => {
               const active = wifiName === 'PETPA5G';
               return (
                 <TouchableOpacity
@@ -544,7 +614,21 @@ const styles = StyleSheet.create({
   refreshIconWrap: {
     position: 'absolute',
     right: 0,
-    top: 1,
+    top: -4,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  refreshIconWrapActive: {
+    backgroundColor: '#EEF1F4',
+  },
+  refreshIconInner: {
+    opacity: 1,
+  },
+  refreshIconInnerRefreshing: {
+    opacity: 0.55,
   },
   cardSubtitle: {
     marginTop: 12,
