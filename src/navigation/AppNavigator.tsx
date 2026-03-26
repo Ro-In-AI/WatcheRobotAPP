@@ -2,7 +2,7 @@ import React from 'react';
 import {NavigationContainer} from '@react-navigation/native';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
-import {Platform, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import {StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {MomentsIcon, NearbyIcon, UserIcon, WatcherIcon} from './TabBarIcons';
 
@@ -32,13 +32,24 @@ export type WatcherStackParamList = {
 };
 
 export type RootTabParamList = {
-  Watcher: undefined;
+  Watcher: {connected?: boolean} | undefined;
   Nearby: undefined;
   Moments: undefined;
   User: undefined;
 };
 
-const Stack = createNativeStackNavigator<WatcherStackParamList>();
+export type RootStackParamList = {
+  MainTabs: {connected?: boolean} | undefined;
+  Dance: undefined;
+  Motion: undefined;
+  Surveillance: undefined;
+  Animation: undefined;
+  BindingGuide: undefined;
+  ScanCode: undefined;
+  WifiSelect: undefined;
+};
+
+const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<RootTabParamList>();
 
 const COLORS = {
@@ -58,24 +69,6 @@ const TAB_CONFIG = [
 const CustomTabBar: React.FC<any> = props => {
   const {state, navigation} = props;
   const insets = useSafeAreaInsets();
-
-  const shouldHideTabBar = () => {
-    try {
-      const currentTab = state.routes[state.index];
-
-      if (currentTab.name === 'Watcher' && currentTab.state) {
-        return currentTab.state.index > 0;
-      }
-    } catch (error) {
-      console.log('TabBar check error:', error);
-    }
-
-    return false;
-  };
-
-  if (shouldHideTabBar()) {
-    return null;
-  }
 
   const tabBarContent = (
     <View style={styles.tabBar}>
@@ -131,37 +124,37 @@ const CustomTabBar: React.FC<any> = props => {
   );
 };
 
-const WatcherStack: React.FC = () => {
+const MainTabs: React.FC = () => {
   return (
-    <Stack.Navigator
+    <Tab.Navigator
+      tabBar={props => <CustomTabBar {...props} />}
       screenOptions={{
         headerShown: false,
       }}>
-      <Stack.Screen name="WatcherHome" component={WatcherPage} />
-      <Stack.Screen name="Dance" component={DancePage} />
-      <Stack.Screen name="Motion" component={MotionPage} />
-      <Stack.Screen name="Surveillance" component={SurveillancePage} />
-      <Stack.Screen name="Animation" component={AnimationPage} />
-      <Stack.Screen name="BindingGuide" component={BindingGuidePage} />
-      <Stack.Screen name="ScanCode" component={ScanCodePage} />
-      <Stack.Screen name="WifiSelect" component={WifiSelectPage} />
-    </Stack.Navigator>
+      <Tab.Screen name="Watcher" component={WatcherPage} />
+      <Tab.Screen name="Nearby" component={NearbyPage} />
+      <Tab.Screen name="Moments" component={MomentsPage} />
+      <Tab.Screen name="User" component={UserPage} />
+    </Tab.Navigator>
   );
 };
 
 export const AppNavigator: React.FC = () => {
   return (
     <NavigationContainer>
-      <Tab.Navigator
-        tabBar={props => <CustomTabBar {...props} />}
+      <Stack.Navigator
         screenOptions={{
           headerShown: false,
         }}>
-        <Tab.Screen name="Watcher" component={WatcherStack} />
-        <Tab.Screen name="Nearby" component={NearbyPage} />
-        <Tab.Screen name="Moments" component={MomentsPage} />
-        <Tab.Screen name="User" component={UserPage} />
-      </Tab.Navigator>
+        <Stack.Screen name="MainTabs" component={MainTabs} />
+        <Stack.Screen name="Dance" component={DancePage} />
+        <Stack.Screen name="Motion" component={MotionPage} />
+        <Stack.Screen name="Surveillance" component={SurveillancePage} />
+        <Stack.Screen name="Animation" component={AnimationPage} />
+        <Stack.Screen name="BindingGuide" component={BindingGuidePage} />
+        <Stack.Screen name="ScanCode" component={ScanCodePage} />
+        <Stack.Screen name="WifiSelect" component={WifiSelectPage} />
+      </Stack.Navigator>
     </NavigationContainer>
   );
 };

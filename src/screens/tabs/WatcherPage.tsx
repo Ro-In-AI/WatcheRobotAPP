@@ -12,11 +12,16 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {Svg, Path} from 'react-native-svg';
 import {useNavigation, useRoute} from '@react-navigation/native';
-import type {RouteProp} from '@react-navigation/native';
+import type {
+  CompositeNavigationProp,
+  RouteProp,
+} from '@react-navigation/native';
+import type {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {
   AnimationIcon,
@@ -26,10 +31,17 @@ import {
 } from '../../components/icons';
 import {bluetoothService} from '../../modules/bluetooth';
 import {useResponsiveScale} from '../../hooks/useResponsiveScale';
-import type {WatcherStackParamList} from '../../navigation/AppNavigator';
+import {STORAGE_KEYS} from '../../utils/storageKeys';
+import type {
+  RootStackParamList,
+  RootTabParamList,
+} from '../../navigation/AppNavigator';
 
-type NavigationProp = NativeStackNavigationProp<WatcherStackParamList>;
-type RouteProps = RouteProp<WatcherStackParamList, 'WatcherHome'>;
+type NavigationProp = CompositeNavigationProp<
+  BottomTabNavigationProp<RootTabParamList, 'Watcher'>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
+type RouteProps = RouteProp<RootTabParamList, 'Watcher'>;
 
 const COLORS = {
   background: '#F5F5F9',
@@ -171,6 +183,8 @@ export const WatcherPage: React.FC = () => {
   const [failureType, setFailureType] = useState<FailureType>(null);
   const [selectedDevice, setSelectedDevice] = useState('Watcher-01');
   const [showDeviceMenu, setShowDeviceMenu] = useState(false);
+  const [hasCompletedInitialBinding, setHasCompletedInitialBinding] =
+    useState(false);
 
   // 页面主要尺寸按统一响应式规则换算
   const horizontalPadding = scaleValue(20, 18, 24);
@@ -209,6 +223,31 @@ export const WatcherPage: React.FC = () => {
       navigation.setParams({connected: undefined});
     }
   }, [navigation, route.params?.connected]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadBindingState = async () => {
+      try {
+        const storedValue = await AsyncStorage.getItem(
+          STORAGE_KEYS.hasCompletedInitialBinding,
+        );
+        if (mounted) {
+          setHasCompletedInitialBinding(storedValue === 'true');
+        }
+      } catch {
+        if (mounted) {
+          setHasCompletedInitialBinding(false);
+        }
+      }
+    };
+
+    loadBindingState();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const wait = (ms: number): Promise<void> =>
     new Promise(resolve => {
@@ -258,6 +297,13 @@ export const WatcherPage: React.FC = () => {
 
     setFailureType(null);
     setIsConnecting(true);
+
+    if (!hasCompletedInitialBinding) {
+      await wait(700);
+      setIsConnecting(false);
+      navigation.navigate('BindingGuide');
+      return;
+    }
 
     try {
       await wait(700);
@@ -414,7 +460,7 @@ export const WatcherPage: React.FC = () => {
                 activeOpacity={isConnected && !isConnecting ? 0.85 : 1}
                 disabled={!isConnected || isConnecting}
                 onPress={() => {
-                  const routeName: keyof WatcherStackParamList =
+                  const routeName: keyof RootStackParamList =
                     card.id === 'DANCE'
                       ? 'Dance'
                       : card.id === 'MOTION'

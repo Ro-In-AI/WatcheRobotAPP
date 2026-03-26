@@ -2,23 +2,27 @@
 import {
   Animated,
   Easing,
+  Keyboard,
   Modal,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import Svg, {Path} from 'react-native-svg';
+import Svg, {Circle, Path} from 'react-native-svg';
 import {WatcherHeader} from '../../components/WatcherHeader';
 import {useResponsiveScale} from '../../hooks/useResponsiveScale';
-import type {WatcherStackParamList} from '../../navigation/AppNavigator';
+import {STORAGE_KEYS} from '../../utils/storageKeys';
+import type {RootStackParamList} from '../../navigation/AppNavigator';
 
 type NavigationProp = NativeStackNavigationProp<
-  WatcherStackParamList,
+  RootStackParamList,
   'WifiSelect'
 >;
 
@@ -74,6 +78,15 @@ const HiddenPasswordIcon: React.FC = () => (
   </Svg>
 );
 
+const VisiblePasswordIcon: React.FC = () => (
+  <Svg width={16} height={16} viewBox="0 0 16 16" fill="none">
+    <Path
+      d="M7.9993 13C5.5553 13 3.3743 11.457 1.4623 8.444C1.37786 8.31131 1.33301 8.15728 1.33301 8C1.33301 7.84272 1.37786 7.68869 1.4623 7.556C3.3743 4.543 5.5553 3 7.9993 3C10.4443 3 12.6253 4.543 14.5373 7.556C14.6217 7.68869 14.6666 7.84272 14.6666 8C14.6666 8.15728 14.6217 8.31131 14.5373 8.444C12.6253 11.457 10.4443 13 7.9993 13ZM7.9993 4C5.9763 4 4.1013 5.31 2.3723 8C4.1023 10.69 5.9763 12 7.9993 12C10.0233 12 11.8973 10.69 13.6263 8C11.8973 5.31 10.0233 4 7.9993 4ZM7.9993 10.333C7.37781 10.3357 6.78069 10.0914 6.33926 9.65389C5.89783 9.21639 5.64821 8.6215 5.6453 8C5.64821 7.3785 5.89783 6.78361 6.33926 6.34611C6.78069 5.90862 7.37781 5.66434 7.9993 5.667C9.2993 5.667 10.3533 6.711 10.3533 8C10.3504 8.6215 10.1008 9.21639 9.65934 9.65389C9.21791 10.0914 8.6208 10.3357 7.9993 10.333ZM7.9993 9.333C8.35452 9.3346 8.69584 9.19508 8.94824 8.94512C9.20063 8.69517 9.34345 8.35522 9.3453 8C9.34345 7.64478 9.20063 7.30484 8.94824 7.05488C8.69584 6.80492 8.35452 6.6654 7.9993 6.667C7.64426 6.66567 7.3032 6.8053 7.05102 7.05523C6.79884 7.30516 6.65615 7.64496 6.6543 8C6.65615 8.35504 6.79884 8.69484 7.05102 8.94477C7.3032 9.1947 7.64426 9.33433 7.9993 9.333Z"
+      fill="#BABFC4"
+    />
+  </Svg>
+);
+
 const PasswordDot: React.FC = () => (
   <Svg width={4} height={4} viewBox="0 0 4 4" fill="none">
     <Path d="M4 2C4 3.10457 3.10457 4 2 4C0.89543 4 0 3.10457 0 2C0 0.89543 0.89543 0 2 0C3.10457 0 4 0.89543 4 2Z" fill="#000000" />
@@ -110,10 +123,14 @@ export const WifiSelectPage: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const insets = useSafeAreaInsets();
   const {scaleValue, verticalScaleValue, windowWidth} = useResponsiveScale();
+  const visiblePasswordInputRef = useRef<TextInput>(null);
+  const hiddenPasswordInputRef = useRef<TextInput>(null);
   const [selectedWifi, setSelectedWifi] = useState<string | null>(null);
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [passwordKeyboardOffset, setPasswordKeyboardOffset] = useState(0);
   const passwordOverlayOpacity = useRef(new Animated.Value(0)).current;
   const passwordSheetTranslateY = useRef(new Animated.Value(28)).current;
   const successOverlayOpacity = useRef(new Animated.Value(0)).current;
@@ -130,10 +147,13 @@ export const WifiSelectPage: React.FC = () => {
   const sheetCardTop = verticalScaleValue(20, 16, 20);
   const sheetActionTop = verticalScaleValue(28, 24, 28);
   const successCardWidth = Math.min(contentWidth, scaleValue(324, 304, 330));
+  const getActivePasswordInput = () =>
+    showPassword ? visiblePasswordInputRef.current : hiddenPasswordInputRef.current;
 
   const handleWifiPress = (wifiName: string) => {
     setSelectedWifi(wifiName);
     setPassword('');
+    setShowPassword(false);
     setShowPasswordModal(true);
   };
 
@@ -142,11 +162,44 @@ export const WifiSelectPage: React.FC = () => {
     setShowSuccessModal(true);
   };
 
-  const handleStartUsing = () => {
+  const handleTogglePasswordVisibility = () => {
+    const nextShowPassword = !showPassword;
+    setShowPassword(nextShowPassword);
+
+    requestAnimationFrame(() => {
+      const target = nextShowPassword
+        ? visiblePasswordInputRef.current
+        : hiddenPasswordInputRef.current;
+      target?.focus();
+      target?.setNativeProps({
+        selection: {start: password.length, end: password.length},
+      });
+    });
+  };
+
+  const handleStartUsing = async () => {
+    try {
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.hasCompletedInitialBinding,
+        'true',
+      );
+    } catch {
+      // 首次绑定标记写入失败时，不阻塞用户继续回到首页。
+    }
+
     setShowSuccessModal(false);
     navigation.reset({
       index: 0,
-      routes: [{name: 'WatcherHome', params: {connected: true}}],
+      routes: [
+        {
+          name: 'MainTabs',
+          params: {connected: true},
+          state: {
+            index: 0,
+            routes: [{name: 'Watcher', params: {connected: true}}],
+          },
+        },
+      ],
     });
   };
 
@@ -154,8 +207,17 @@ export const WifiSelectPage: React.FC = () => {
     if (!showPasswordModal) {
       passwordOverlayOpacity.setValue(0);
       passwordSheetTranslateY.setValue(28);
+      setPasswordKeyboardOffset(0);
       return;
     }
+
+    requestAnimationFrame(() => {
+      const target = getActivePasswordInput();
+      target?.focus();
+      target?.setNativeProps({
+        selection: {start: password.length, end: password.length},
+      });
+    });
 
     Animated.parallel([
       Animated.timing(passwordOverlayOpacity, {
@@ -171,7 +233,33 @@ export const WifiSelectPage: React.FC = () => {
         useNativeDriver: true,
       }),
     ]).start();
-  }, [passwordOverlayOpacity, passwordSheetTranslateY, showPasswordModal]);
+  }, [
+    passwordOverlayOpacity,
+    passwordSheetTranslateY,
+    showPasswordModal,
+  ]);
+
+  useEffect(() => {
+    const showEvent =
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent =
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSubscription = Keyboard.addListener(showEvent, event => {
+      setPasswordKeyboardOffset(
+        Math.max(0, event.endCoordinates.height - insets.bottom),
+      );
+    });
+
+    const hideSubscription = Keyboard.addListener(hideEvent, () => {
+      setPasswordKeyboardOffset(0);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [insets.bottom]);
 
   useEffect(() => {
     if (!showSuccessModal) {
@@ -248,73 +336,6 @@ export const WifiSelectPage: React.FC = () => {
         </View>
 
         <Modal
-          visible={showPasswordModal}
-          transparent
-          animationType="none"
-          statusBarTranslucent
-          onRequestClose={() => setShowPasswordModal(false)}>
-          <Animated.View
-            style={[
-              styles.overlay,
-              {opacity: passwordOverlayOpacity},
-            ]}>
-            <Animated.View
-              style={[
-                styles.bottomSheet,
-                {
-                  height: sheetHeight,
-                  transform: [{translateY: passwordSheetTranslateY}],
-                },
-              ]}>
-              <Text style={styles.sheetTitle}>Enter the password</Text>
-
-              <View style={[styles.sheetCard, {marginTop: sheetCardTop}]}>
-                <Text style={styles.sheetWifiName}>
-                  WiFi name : {selectedWifi ?? ''}
-                </Text>
-
-                <View style={styles.inputWrap}>
-                  {password.length === 0 ? (
-                    <View style={styles.passwordDots}>
-                      {Array.from({length: 8}).map((_, index) => (
-                        <PasswordDot key={index} />
-                      ))}
-                    </View>
-                  ) : null}
-                  <TextInput
-                    value={password}
-                    onChangeText={setPassword}
-                    placeholder=""
-                    placeholderTextColor="#000000"
-                    secureTextEntry
-                    style={styles.passwordInput}
-                  />
-                  <View style={styles.eyeHint}>
-                    <HiddenPasswordIcon />
-                  </View>
-                </View>
-
-                <View style={[styles.sheetActions, {marginTop: sheetActionTop}]}>
-                  <TouchableOpacity
-                    style={styles.secondaryButton}
-                    activeOpacity={0.85}
-                    onPress={() => setShowPasswordModal(false)}>
-                    <Text style={styles.secondaryButtonText}>Cancel</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.primaryButton}
-                    activeOpacity={0.85}
-                    onPress={handleConfirmPassword}>
-                    <Text style={styles.primaryButtonText}>Confirm</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </Animated.View>
-          </Animated.View>
-        </Modal>
-
-        <Modal
           visible={showSuccessModal}
           transparent
           animationType="none"
@@ -350,6 +371,137 @@ export const WifiSelectPage: React.FC = () => {
           </Animated.View>
         </Modal>
       </View>
+
+      <Modal
+        visible={showPasswordModal}
+        transparent
+        animationType="none"
+        statusBarTranslucent
+        onRequestClose={() => setShowPasswordModal(false)}>
+        <Animated.View
+          style={[
+            styles.overlay,
+            {opacity: passwordOverlayOpacity},
+          ]}>
+          <TouchableOpacity
+            style={styles.overlayTapArea}
+            activeOpacity={1}
+            onPress={() => setShowPasswordModal(false)}
+          />
+          <Animated.View
+            style={[
+              styles.bottomSheet,
+              {
+                height: sheetHeight,
+                marginBottom: passwordKeyboardOffset,
+                transform: [{translateY: passwordSheetTranslateY}],
+              },
+            ]}>
+            <Text style={styles.sheetTitle}>Enter the password</Text>
+
+            <View style={[styles.sheetCard, {marginTop: sheetCardTop}]}>
+              <Text style={styles.sheetWifiName}>
+                WiFi name : {selectedWifi ?? ''}
+              </Text>
+
+              {showPassword ? (
+                <View style={styles.inputWrap}>
+                  <TextInput
+                    ref={visiblePasswordInputRef}
+                    value={password}
+                    onChangeText={text => {
+                      setPassword(text);
+                      requestAnimationFrame(() => {
+                        visiblePasswordInputRef.current?.setNativeProps({
+                          selection: {start: text.length, end: text.length},
+                        });
+                      });
+                    }}
+                    onFocus={() => {
+                      requestAnimationFrame(() => {
+                        visiblePasswordInputRef.current?.setNativeProps({
+                          selection: {start: password.length, end: password.length},
+                        });
+                      });
+                    }}
+                    placeholder=""
+                    placeholderTextColor="#000000"
+                    secureTextEntry={false}
+                    autoFocus
+                    autoCorrect={false}
+                    spellCheck={false}
+                    autoCapitalize="none"
+                    autoComplete="off"
+                    selectionColor={COLORS.black}
+                    style={styles.passwordInput}
+                  />
+                  <TouchableOpacity
+                    style={styles.eyeHint}
+                    activeOpacity={0.8}
+                    onPress={handleTogglePasswordVisibility}>
+                    <VisiblePasswordIcon />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={styles.inputWrap}
+                  activeOpacity={1}
+                  onPress={() => hiddenPasswordInputRef.current?.focus()}>
+                  <TextInput
+                    ref={hiddenPasswordInputRef}
+                    value={password}
+                    onChangeText={setPassword}
+                    placeholder=""
+                    placeholderTextColor="#000000"
+                    secureTextEntry
+                    autoFocus
+                    autoCorrect={false}
+                    spellCheck={false}
+                    autoCapitalize="none"
+                    autoComplete="off"
+                    importantForAutofill="no"
+                    selectionColor="transparent"
+                    caretHidden
+                    contextMenuHidden
+                    style={styles.maskedPasswordInput}
+                  />
+                  <View style={styles.hiddenPasswordMask} pointerEvents="none" />
+                  {password.length > 0 ? (
+                    <View style={styles.passwordDots} pointerEvents="none">
+                      {Array.from({length: password.length}).map((_, index) => (
+                        <PasswordDot key={index} />
+                      ))}
+                    </View>
+                  ) : null}
+                  <View style={styles.hiddenPasswordPlaceholder} />
+                  <TouchableOpacity
+                    style={styles.eyeHint}
+                    activeOpacity={0.8}
+                    onPress={handleTogglePasswordVisibility}>
+                    <HiddenPasswordIcon />
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              )}
+
+              <View style={[styles.sheetActions, {marginTop: sheetActionTop}]}>
+                <TouchableOpacity
+                  style={styles.secondaryButton}
+                  activeOpacity={0.85}
+                  onPress={() => setShowPasswordModal(false)}>
+                  <Text style={styles.secondaryButtonText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.primaryButton}
+                  activeOpacity={0.85}
+                  onPress={handleConfirmPassword}>
+                  <Text style={styles.primaryButtonText}>Confirm</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Animated.View>
+        </Animated.View>
+      </Modal>
     </View>
   );
 };
@@ -432,10 +584,14 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.overlay,
     justifyContent: 'flex-end',
   },
+  overlayTapArea: {
+    flex: 1,
+  },
   centerOverlay: {
     justifyContent: 'center',
   },
   bottomSheet: {
+    position: 'relative',
     backgroundColor: COLORS.background,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
@@ -443,6 +599,8 @@ const styles = StyleSheet.create({
     paddingTop: 30,
     paddingBottom: 34,
     alignItems: 'center',
+    zIndex: 30,
+    elevation: 30,
   },
   sheetTitle: {
     fontFamily: 'Inter',
@@ -474,29 +632,78 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
+    overflow: 'hidden',
   },
   passwordInput: {
     flex: 1,
     fontFamily: 'Inter',
     fontSize: 16,
-    lineHeight: 16,
+    lineHeight: 20,
     color: COLORS.black,
     paddingVertical: 0,
+    paddingRight: 44,
+  },
+  maskedPasswordInput: {
+    position: 'absolute',
+    left: 12,
+    right: 52,
+    top: 0,
+    bottom: 0,
+    fontFamily: 'Inter',
+    fontSize: 16,
+    lineHeight: 20,
+    color: 'transparent',
+    textShadowColor: 'transparent',
+    backgroundColor: 'transparent',
+    paddingVertical: 0,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+    zIndex: 0,
+  },
+  hiddenPasswordInput: {
+    position: 'absolute',
+    left: -9999,
+    width: 1,
+    height: 1,
+    opacity: 0,
+    color: 'transparent',
+    textShadowColor: 'transparent',
+    backgroundColor: 'transparent',
+    paddingVertical: 0,
+  },
+  hiddenPasswordPlaceholder: {
+    flex: 1,
+  },
+  hiddenPasswordMask: {
+    position: 'absolute',
+    left: 12,
+    right: 52,
+    top: 0,
+    bottom: 0,
+    backgroundColor: COLORS.inputBg,
+    zIndex: 1,
   },
   passwordDots: {
     position: 'absolute',
     left: 12,
-    right: 36,
+    right: 52,
     height: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    overflow: 'hidden',
+    zIndex: 2,
   },
   eyeHint: {
-    width: 15,
-    height: 7,
+    position: 'absolute',
+    right: 8,
+    top: 10,
+    width: 32,
+    height: 32,
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 2,
+    elevation: 2,
   },
   sheetActions: {
     flexDirection: 'row',
