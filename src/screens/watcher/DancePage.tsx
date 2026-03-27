@@ -37,6 +37,8 @@ type DanceItem = WatcherActionItem;
 
 const DEFAULT_ITEMS: DanceItem[] = WATCHER_ACTION_ITEMS;
 
+// Customization 区域预留给后续“用户自定义动作”能力，
+// 当前先保留基础占位和新增入口，方便后面直接接入真实数据。
 const CUSTOM_ITEMS: DanceItem[] = [
   {
     id: 'custom-love',
@@ -98,6 +100,7 @@ export const DancePage: React.FC = () => {
   const itemImageSize = Math.min(scaleValue(85, 78, 88), itemWidth - scaleValue(22, 18, 24));
   const addButtonSize = Math.min(scaleValue(75, 70, 80), itemWidth);
 
+  // Default 展示系统内置动作；Customization 后续承接用户自定义动作。
   const currentItems =
     selectedTab === 'default' ? DEFAULT_ITEMS : CUSTOM_ITEMS;
 
@@ -209,7 +212,9 @@ export const DancePage: React.FC = () => {
             paddingHorizontal: bottomCardPaddingHorizontal,
           },
         ]}>
-        <Text style={styles.sectionTitle}>Other</Text>
+        <Text style={styles.sectionTitle}>
+          {selectedTab === 'default' ? 'Other' : 'My dance'}
+        </Text>
 
         <ScrollView
           showsVerticalScrollIndicator={false}
@@ -236,8 +241,9 @@ export const DancePage: React.FC = () => {
                       />
                       <Text
                         style={styles.gridLabel}
-                        numberOfLines={2}
-                        ellipsizeMode="tail">
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.72}>
                         {item.title}
                       </Text>
                     </TouchableOpacity>
@@ -260,10 +266,17 @@ export const DancePage: React.FC = () => {
                         style={{width: itemImageSize, height: itemImageSize}}
                         resizeMode="contain"
                       />
-                      <Text style={styles.gridLabel}>{item.title}</Text>
+                      <Text
+                        style={styles.gridLabel}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.72}>
+                        {item.title}
+                      </Text>
                     </TouchableOpacity>
                   ))}
 
+                  {/* 这里的加号入口用于后续新增用户自定义动作。 */}
                   <TouchableOpacity
                     activeOpacity={0.85}
                     style={[
@@ -322,7 +335,7 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
   },
   tabTextActive: {
-    fontWeight: '600',
+    fontWeight: '700',
     color: COLORS.black,
   },
   heroSection: {
@@ -358,7 +371,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   gridItem: {
-    paddingHorizontal: 13,
+    paddingHorizontal: 8,
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
@@ -370,7 +383,8 @@ const styles = StyleSheet.create({
   },
   gridLabel: {
     fontFamily: 'Inter',
-    fontSize: 14,
+    width: '100%',
+    fontSize: 12,
     lineHeight: 14,
     fontWeight: '400',
     color: '#000000',

@@ -26,7 +26,6 @@ const COLORS = {
   background: '#F5F5F9',
   white: '#FFFFFF',
   black: '#000000',
-  title: '#1A1A1A',
   secondary: '#8E959F',
   green: '#8FC31F',
   greenDark: '#77C320',
@@ -41,9 +40,15 @@ type MotionNavigationProp = NativeStackNavigationProp<WatcherStackParamList>;
 
 type ArrowIconProps = {
   direction: 'up' | 'right' | 'down' | 'left';
+  active?: boolean;
+  disabled?: boolean;
 };
 
-const ArrowIcon: React.FC<ArrowIconProps> = ({direction}) => {
+const ArrowIcon: React.FC<ArrowIconProps> = ({
+  direction,
+  active = false,
+  disabled = false,
+}) => {
   const rotation = {
     up: '0deg',
     right: '90deg',
@@ -56,10 +61,12 @@ const ArrowIcon: React.FC<ArrowIconProps> = ({direction}) => {
       width={35}
       height={35}
       viewBox="0 0 28 28"
-      style={{transform: [{rotate: rotation[direction]}]}}>
+      style={{
+        transform: [{rotate: rotation[direction]}, {scale: active ? 1.08 : 1}],
+      }}>
       <Path
         d="M14.4301 2.44547C14.6624 2.04312 15.2432 2.04312 15.4756 2.44547L21.2187 12.3933C21.451 12.7956 21.1608 13.2985 20.6969 13.2985H9.2088C8.74494 13.2985 8.45467 12.7956 8.687 12.3933L14.4301 2.44547Z"
-        fill={COLORS.green}
+        fill={active ? COLORS.greenDark : COLORS.green}
       />
     </Svg>
   );
@@ -72,9 +79,12 @@ export const MotionPage: React.FC = () => {
   const navigation = useNavigation<MotionNavigationProp>();
   const {status, sendCommand} = useBluetooth();
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
+  const [pressedDirection, setPressedDirection] = useState<
+    'up' | 'right' | 'down' | 'left' | null
+  >(null);
   const isConnected = status === BluetoothStatus.Connected;
 
-  // 页面主要尺寸按统一响应式规则换算
+  // 页面主要尺寸按统一响应式规则换算。
   const horizontalPadding = scaleValue(20, 18, 24);
   const headerSideInset = scaleValue(30, 26, 32);
   const contentWidth = windowWidth - horizontalPadding * 2;
@@ -107,7 +117,8 @@ export const MotionPage: React.FC = () => {
       left: directionCrossAxisOffset,
     },
     right: {
-      right: joystickOuterRadius - directionButtonSize / 2 - directionTrackRadius,
+      right:
+        joystickOuterRadius - directionButtonSize / 2 - directionTrackRadius,
       top: directionCrossAxisOffset,
     },
     down: {
@@ -121,7 +132,7 @@ export const MotionPage: React.FC = () => {
     },
   } as const;
 
-  // 复用旧控制页的方向命令：X 轴控制左右，Y 轴控制上下。
+  // 复用方向命令：X 轴控制左右，Y 轴控制上下。
   const sendMoveCommand = useCallback(
     async (servoId: number, direction: number) => {
       if (!isConnected) {
@@ -146,7 +157,6 @@ export const MotionPage: React.FC = () => {
     <View style={styles.container}>
       <View style={{height: insets.top, backgroundColor: COLORS.background}} />
 
-      {/* 公共页眉 */}
       <WatcherHeader
         title="Motion"
         onBack={() => navigation.goBack()}
@@ -155,7 +165,6 @@ export const MotionPage: React.FC = () => {
       />
 
       <View style={styles.content}>
-        {/* 顶部机器人主视觉 */}
         <View
           style={[
             styles.robotSection,
@@ -182,7 +191,6 @@ export const MotionPage: React.FC = () => {
           ]}>
           <Text style={styles.sectionTitle}>Joystick</Text>
 
-          {/* 摇杆控制区 */}
           <View
             style={[
               styles.joystickSection,
@@ -202,8 +210,14 @@ export const MotionPage: React.FC = () => {
                 activeOpacity={0.75}
                 disabled={!isConnected}
                 hitSlop={8}
-                onPressIn={() => sendMoveCommand(1, 1)}
-                onPressOut={() => sendMoveCommand(1, 0)}
+                onPressIn={() => {
+                  setPressedDirection('up');
+                  sendMoveCommand(1, 1);
+                }}
+                onPressOut={() => {
+                  setPressedDirection(null);
+                  sendMoveCommand(1, 0);
+                }}
                 style={[
                   styles.directionTouchArea,
                   directionPositions.up,
@@ -212,16 +226,26 @@ export const MotionPage: React.FC = () => {
                     height: directionButtonSize,
                     borderRadius: directionButtonSize / 2,
                   },
-                ]}
-              >
-                <ArrowIcon direction="up" />
+                  pressedDirection === 'up' && styles.directionTouchAreaActive,
+                ]}>
+                <ArrowIcon
+                  direction="up"
+                  active={pressedDirection === 'up'}
+                  disabled={!isConnected}
+                />
               </TouchableOpacity>
               <TouchableOpacity
                 activeOpacity={0.75}
                 disabled={!isConnected}
                 hitSlop={8}
-                onPressIn={() => sendMoveCommand(0, 1)}
-                onPressOut={() => sendMoveCommand(0, 0)}
+                onPressIn={() => {
+                  setPressedDirection('right');
+                  sendMoveCommand(0, 1);
+                }}
+                onPressOut={() => {
+                  setPressedDirection(null);
+                  sendMoveCommand(0, 0);
+                }}
                 style={[
                   styles.directionTouchArea,
                   directionPositions.right,
@@ -230,16 +254,26 @@ export const MotionPage: React.FC = () => {
                     height: directionButtonSize,
                     borderRadius: directionButtonSize / 2,
                   },
-                ]}
-              >
-                <ArrowIcon direction="right" />
+                  pressedDirection === 'right' && styles.directionTouchAreaActive,
+                ]}>
+                <ArrowIcon
+                  direction="right"
+                  active={pressedDirection === 'right'}
+                  disabled={!isConnected}
+                />
               </TouchableOpacity>
               <TouchableOpacity
                 activeOpacity={0.75}
                 disabled={!isConnected}
                 hitSlop={8}
-                onPressIn={() => sendMoveCommand(1, -1)}
-                onPressOut={() => sendMoveCommand(1, 0)}
+                onPressIn={() => {
+                  setPressedDirection('down');
+                  sendMoveCommand(1, -1);
+                }}
+                onPressOut={() => {
+                  setPressedDirection(null);
+                  sendMoveCommand(1, 0);
+                }}
                 style={[
                   styles.directionTouchArea,
                   directionPositions.down,
@@ -248,16 +282,26 @@ export const MotionPage: React.FC = () => {
                     height: directionButtonSize,
                     borderRadius: directionButtonSize / 2,
                   },
-                ]}
-              >
-                <ArrowIcon direction="down" />
+                  pressedDirection === 'down' && styles.directionTouchAreaActive,
+                ]}>
+                <ArrowIcon
+                  direction="down"
+                  active={pressedDirection === 'down'}
+                  disabled={!isConnected}
+                />
               </TouchableOpacity>
               <TouchableOpacity
                 activeOpacity={0.75}
                 disabled={!isConnected}
                 hitSlop={8}
-                onPressIn={() => sendMoveCommand(0, -1)}
-                onPressOut={() => sendMoveCommand(0, 0)}
+                onPressIn={() => {
+                  setPressedDirection('left');
+                  sendMoveCommand(0, -1);
+                }}
+                onPressOut={() => {
+                  setPressedDirection(null);
+                  sendMoveCommand(0, 0);
+                }}
                 style={[
                   styles.directionTouchArea,
                   directionPositions.left,
@@ -266,9 +310,13 @@ export const MotionPage: React.FC = () => {
                     height: directionButtonSize,
                     borderRadius: directionButtonSize / 2,
                   },
-                ]}
-              >
-                <ArrowIcon direction="left" />
+                  pressedDirection === 'left' && styles.directionTouchAreaActive,
+                ]}>
+                <ArrowIcon
+                  direction="left"
+                  active={pressedDirection === 'left'}
+                  disabled={!isConnected}
+                />
               </TouchableOpacity>
               <View
                 style={[
@@ -295,13 +343,17 @@ export const MotionPage: React.FC = () => {
 
           <View style={styles.divider} />
 
-          {/* 底部动作列表 */}
           <View style={styles.danceSection}>
-            <Text style={[styles.danceTitle, {marginBottom: danceTop}]}>Dance</Text>
+            <Text style={[styles.danceTitle, {marginBottom: danceTop}]}>
+              Dance
+            </Text>
 
             <ScrollView
               style={styles.danceScroll}
-              contentContainerStyle={[styles.grid, {paddingBottom: gridBottomPadding}]}
+              contentContainerStyle={[
+                styles.grid,
+                {paddingBottom: gridBottomPadding},
+              ]}
               showsVerticalScrollIndicator={false}>
               {WATCHER_ACTION_ITEMS.map(item => (
                 <TouchableOpacity
@@ -312,14 +364,23 @@ export const MotionPage: React.FC = () => {
                   ]}
                   activeOpacity={0.85}
                   onPress={() =>
-                    setSelectedItem(current => (current === item.id ? null : item.id))
+                    setSelectedItem(current =>
+                      current === item.id ? null : item.id,
+                    )
                   }>
                   <Image
                     source={item.imageSource}
-                    style={[styles.gridImage, {width: gridImageSize, height: gridImageSize}]}
+                    style={[
+                      styles.gridImage,
+                      {width: gridImageSize, height: gridImageSize},
+                    ]}
                     resizeMode="contain"
                   />
-                  <Text style={styles.gridLabel} numberOfLines={1}>
+                  <Text
+                    style={styles.gridLabel}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.72}>
                     {item.title}
                   </Text>
                 </TouchableOpacity>
@@ -387,6 +448,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  directionTouchAreaActive: {
+    backgroundColor: 'rgba(143, 195, 31, 0.12)',
+  },
   joystickCenterOuter: {
     backgroundColor: COLORS.lightRing,
     justifyContent: 'center',
@@ -429,7 +493,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingTop: 12,
     paddingBottom: 12,
-    paddingHorizontal: 13,
+    paddingHorizontal: 8,
   },
   gridItemActive: {
     backgroundColor: '#F3F5F8',
@@ -440,7 +504,7 @@ const styles = StyleSheet.create({
   gridLabel: {
     width: '100%',
     fontFamily: 'Inter',
-    fontSize: 14,
+    fontSize: 12,
     lineHeight: 14,
     fontWeight: '400',
     color: COLORS.black,
