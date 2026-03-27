@@ -2,10 +2,12 @@
   "permissions": {
     "allow": [
       "Bash(npx tsc:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(grep -n \"require.*assets\" \"d:/WatcheRobotAPP/src/screens/watcher/\"*.tsx)"
     ],
     "additionalDirectories": [
-      "d:\\WatcheRobotAPP\\src\\assets\\icons"
+      "d:\\WatcheRobotAPP\\src\\assets\\icons",
+      "D:\\WatcheRobotAPP\\src\\screens\\watcher"
     ]
   }
 }

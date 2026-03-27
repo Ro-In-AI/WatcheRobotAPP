@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
 
+// User 当前是个人中心占位页，后续适合继续补账号、设置和设备管理入口。
 export const UserPage: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>

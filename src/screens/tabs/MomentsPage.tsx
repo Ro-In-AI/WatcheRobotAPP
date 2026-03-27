@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
 
+// Moments 当前还是占位页，后续可在这里承接动态流或社区内容。
 export const MomentsPage: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>

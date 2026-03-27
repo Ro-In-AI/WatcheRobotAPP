@@ -1,10 +1,9 @@
-import React, {useEffect, useRef, useState} from 'react';
+﻿import React, {useCallback, useEffect, useState} from 'react';
 import {
   LayoutAnimation,
   Image,
   ImageBackground,
   LayoutChangeEvent,
-  PanResponder,
   Platform,
   ScrollView,
   StyleSheet,
@@ -15,7 +14,15 @@ import {
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import Svg, {Circle, Defs, Ellipse, LinearGradient, Path, Stop} from 'react-native-svg';
+import Svg, {Circle, Ellipse, Path} from 'react-native-svg';
+import {
+  BluetoothStatus,
+  BLUETOOTH_UUIDS,
+  COMMANDS,
+  useBluetooth,
+} from '../../modules/bluetooth';
+import {WatcherHeader} from '../../components/WatcherHeader';
+import {useResponsiveScale} from '../../hooks/useResponsiveScale';
 
 const COLORS = {
   background: '#F2F2F7',
@@ -33,9 +40,6 @@ const FIGMA_BOTTOM_AREA_HEIGHT = 479;
 const BOTTOM_SHEET_HEIGHT = 188;
 const FIGMA_OPEN_CONTROLS_BOTTOM = 203;
 const CLOSED_CONTROLS_BOTTOM = 28;
-const JOYSTICK_KNOB_RADIUS = 30;
-const DEFAULT_JOYSTICK_MAX_DISTANCE = 43;
-const COMPACT_JOYSTICK_MAX_DISTANCE = 28;
 const OTHER_ITEMS = [
   {
     title: 'Love',
@@ -75,24 +79,34 @@ const OTHER_ITEMS = [
   },
 ];
 
-const BackIcon: React.FC = () => (
-  <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+const MicrophoneIcon: React.FC = () => (
+  <Svg width={22} height={22} viewBox="0 0 200 200" fill="none">
     <Path
-      d="M9.23544 11.9995L17.3905 19.8827C17.8711 20.3481 17.8711 21.1014 17.3905 21.5653C16.9098 22.03 16.13 22.03 15.6494 21.5653L6.62452 12.8406C6.14458 12.376 6.14458 11.6223 6.62452 11.1591L15.6494 2.43481C15.8905 2.20246 16.2055 2.0863 16.5207 2.0863C16.8358 2.0863 17.1509 2.20248 17.3905 2.43555C17.8711 2.90024 17.8711 3.65242 17.3905 4.1171L9.23544 11.9995Z"
-      fill={COLORS.black}
+      d="M99.9997 133.333C77.083 133.333 58.333 113.333 58.333 88.3333V45C58.333 20 77.083 0 99.9997 0C122.916 0 141.666 20 141.666 45V88.75C141.666 113.333 122.916 133.333 99.9997 133.333ZM99.9997 16.6667C86.2497 16.6667 74.9997 29.1667 74.9997 45V88.75C74.9997 104.167 86.2497 117.083 99.9997 117.083C113.75 117.083 125 104.583 125 88.75V45C125 29.1667 113.75 16.6667 99.9997 16.6667Z"
+      fill="#020202"
+    />
+    <Path
+      d="M162.5 84.1667C157.917 84.1667 154.167 87.9167 154.167 92.5V100.833C154.167 128.333 131.667 150.833 104.167 150.833H95.8337C68.3337 150.833 45.8337 128.333 45.8337 100.833V92.5C45.8337 87.9167 42.0837 84.1667 37.5003 84.1667C32.917 84.1667 29.167 87.9167 29.167 92.5V100.833C29.167 136.25 56.667 165 91.667 167.083V183.333H70.417C66.2503 183.333 62.5003 187.083 62.5003 191.25V192.083C62.5003 196.25 66.2503 200 70.417 200H129.584C133.75 200 137.5 196.25 137.5 192.083V191.25C137.5 187.083 133.75 183.333 129.584 183.333H108.334V167.083C143.334 165 170.834 135.833 170.834 100.833V92.5C170.834 87.9167 167.084 84.1667 162.5 84.1667Z"
+      fill="#020202"
     />
   </Svg>
 );
 
-const MicrophoneIcon: React.FC = () => (
-  <Svg width={22} height={22} viewBox="0 0 22 22" fill="none">
+const MutedMicrophoneIcon: React.FC = () => (
+  <Svg width={22} height={22} viewBox="0 0 200 200" fill="none">
     <Path
-      d="M11.0003 14.6667C8.47949 14.6667 6.41699 12.4667 6.41699 9.71667V4.95C6.41699 2.2 8.47949 0 11.0003 0C13.5212 0 15.5837 2.2 15.5837 4.95V9.7625C15.5837 12.4667 13.5212 14.6667 11.0003 14.6667ZM11.0003 1.83333C9.48783 1.83333 8.25033 3.20833 8.25033 4.95V9.7625C8.25033 11.4583 9.48783 12.8792 11.0003 12.8792C12.5128 12.8792 13.7503 11.5042 13.7503 9.7625V4.95C13.7503 3.20833 12.5128 1.83333 11.0003 1.83333Z"
+      d="M162.5 84.1675C167.083 84.1675 170.833 87.9173 170.833 92.5005V100.834C170.833 135.834 143.333 165.001 108.333 167.084V183.334H129.583C133.75 183.334 137.5 187.084 137.5 191.25V192.084C137.5 196.251 133.75 200 129.583 200H70.417C66.2504 200 62.5002 196.251 62.5 192.084V191.25C62.5002 187.084 66.2504 183.334 70.417 183.334H91.667V167.084C78.8198 166.32 66.9826 161.962 57.1455 155L69.2002 143.095C76.9237 147.991 86.062 150.834 95.833 150.834H104.167C131.667 150.834 154.167 128.334 154.167 100.834V92.5005C154.167 87.9173 157.917 84.1675 162.5 84.1675ZM37.5 84.1675C42.0832 84.1675 45.8328 87.9173 45.833 92.5005V100.834C45.8331 112.091 49.6048 122.508 55.9443 130.889L43.9883 142.697C34.711 131.293 29.1671 116.736 29.167 100.834V92.5005C29.1672 87.9173 32.9168 84.1675 37.5 84.1675Z"
       fill="#020202"
     />
     <Path
-      d="M17.8747 9.25833C17.3705 9.25833 16.958 9.67083 16.958 10.175V11.0917C16.958 14.1167 14.483 16.5917 11.458 16.5917H10.5413C7.51634 16.5917 5.04134 14.1167 5.04134 11.0917V10.175C5.04134 9.67083 4.62884 9.25833 4.12467 9.25833C3.62051 9.25833 3.20801 9.67083 3.20801 10.175V11.0917C3.20801 14.9875 6.23301 18.15 10.083 18.3792V20.1667H7.74551C7.28717 20.1667 6.87467 20.5792 6.87467 21.0375V21.1292C6.87467 21.5875 7.28717 22 7.74551 22H14.2538C14.7122 22 15.1247 21.5875 15.1247 21.1292V21.0375C15.1247 20.5792 14.7122 20.1667 14.2538 20.1667H11.9163V18.3792C15.7663 18.15 18.7913 14.9417 18.7913 11.0917V10.175C18.7913 9.67083 18.3788 9.25833 17.8747 9.25833Z"
+      d="M141.667 88.75C141.667 113.333 122.917 133.333 100 133.333C93.9602 133.333 88.2106 131.942 83.0166 129.438L95.9199 116.696C97.2486 116.949 98.6113 117.083 100 117.083C113.75 117.083 125 104.583 125 88.75V87.9775L141.667 71.5176V88.75ZM100 0C122.917 0 141.667 20 141.667 45V46.2197L125 62.6797V45C125 29.1667 113.75 16.667 100 16.667C86.25 16.667 75 29.1667 75 45V88.75C75 95.4217 77.1077 101.625 80.6123 106.516L68.8027 118.178C62.2968 110.256 58.333 99.8235 58.333 88.333V45C58.333 20 77.0834 4.25915e-05 100 0Z"
       fill="#020202"
+    />
+    <Path
+      d="M171 11.0001L22 158"
+      stroke="#020202"
+      strokeWidth={18}
+      strokeLinecap="round"
     />
   </Svg>
 );
@@ -117,7 +131,7 @@ const SpeakerIcon: React.FC = () => (
 
 const ExpandIcon: React.FC = () => (
   <View style={styles.expandIconCircle}>
-    <Svg width={12} height={12} viewBox="0 0 12 12" fill="none">
+    <Svg width={14} height={14} viewBox="0 0 12 12" fill="none">
       <Path
         d="M5.10407 6.37917L5.22938 6.50556C5.26279 6.53927 5.29621 6.57086 5.32962 6.60035C5.36304 6.62985 5.39645 6.66144 5.42986 6.69515L5.58023 6.84682C5.7473 7.01534 5.81413 7.16279 5.78072 7.28918C5.7473 7.41557 5.64288 7.56303 5.46746 7.73155C5.39227 7.81581 5.26906 7.9443 5.09781 8.11704C4.92656 8.28977 4.74278 8.47725 4.54647 8.67947C4.35016 8.8817 4.16011 9.0755 3.97633 9.26087C3.79255 9.44624 3.65054 9.5937 3.5503 9.70324C3.39993 9.8549 3.29551 9.98761 3.23703 10.1014C3.17856 10.2151 3.20362 10.3268 3.31222 10.4363C3.3874 10.5121 3.48347 10.6132 3.60042 10.7396C3.71737 10.866 3.81761 10.9714 3.90115 11.0556C4.04316 11.1989 4.09537 11.3252 4.05778 11.4348C4.02019 11.5443 3.89697 11.6075 3.68813 11.6244C3.47094 11.6496 3.22868 11.6791 2.96136 11.7128C2.69405 11.7465 2.41838 11.7781 2.13435 11.8076C1.85033 11.8371 1.57257 11.8687 1.30108 11.9024C1.02959 11.9361 0.781065 11.9656 0.555517 11.9909C0.338322 12.0162 0.187957 11.9888 0.10442 11.9087C0.0208841 11.8287 -0.0125305 11.6876 0.00417682 11.4853C0.0208841 11.2747 0.0438566 11.0388 0.0730943 10.7776C0.102332 10.5163 0.133658 10.2488 0.167073 9.97498C0.200487 9.70113 0.231813 9.42939 0.261051 9.15976C0.290289 8.89013 0.317438 8.64156 0.342499 8.41405C0.36756 8.1697 0.436478 8.01382 0.549252 7.94641C0.662026 7.879 0.789419 7.91692 0.931431 8.06016C1.01497 8.14442 1.12356 8.24764 1.25722 8.36982C1.39088 8.492 1.50365 8.59943 1.59554 8.69211C1.68743 8.7848 1.77515 8.81429 1.85868 8.78059C1.94222 8.74688 2.03829 8.67947 2.14688 8.57836C2.25548 8.46882 2.40376 8.31716 2.59172 8.12336C2.77967 7.92956 2.97598 7.72944 3.18065 7.523C3.38531 7.31657 3.58371 7.11434 3.77584 6.91633C3.96798 6.71832 4.12252 6.56033 4.23947 6.44237C4.28959 6.39181 4.34598 6.34336 4.40863 6.29702C4.47128 6.25067 4.5402 6.21908 4.61538 6.20222C4.69057 6.18537 4.76784 6.18959 4.8472 6.21486C4.92656 6.24014 5.01218 6.29491 5.10407 6.37917ZM11.4445 0.00910011C11.6617 -0.016178 11.812 0.0112066 11.8956 0.0912538C11.9791 0.171301 12.0125 0.312437 11.9958 0.514661C11.9791 0.725312 11.9561 0.96124 11.9269 1.22245C11.8977 1.48365 11.8663 1.75118 11.8329 2.02503C11.7995 2.29887 11.7682 2.57272 11.7389 2.84656C11.7097 3.12041 11.6826 3.37108 11.6575 3.59858C11.6324 3.84294 11.5635 3.99671 11.4507 4.05991C11.338 4.1231 11.2106 4.08308 11.0686 3.93984C10.985 3.85558 10.8702 3.74604 10.724 3.61122C10.5778 3.47641 10.4588 3.36266 10.3669 3.26997C10.275 3.17728 10.1956 3.13726 10.1288 3.1499C10.062 3.16254 9.97842 3.21941 9.87818 3.32053C9.76122 3.43849 9.60877 3.59437 9.42081 3.78817C9.23286 3.98197 9.03446 4.1863 8.82562 4.40116C8.61678 4.61603 8.41211 4.82457 8.21163 5.02679L7.748 5.49444C7.69788 5.54499 7.64358 5.59555 7.5851 5.64611C7.52663 5.69666 7.46189 5.73458 7.39088 5.75986C7.31987 5.78514 7.24469 5.78935 7.16533 5.7725C7.08597 5.75565 7.00453 5.70088 6.92099 5.60819L6.44483 5.12791C6.27776 4.95939 6.20466 4.80561 6.22555 4.66658C6.24643 4.52755 6.34041 4.37378 6.50748 4.20526C6.58267 4.12942 6.70797 4.00093 6.8834 3.81977C7.05882 3.63861 7.24678 3.44692 7.44727 3.24469C7.64776 3.04247 7.84198 2.84446 8.02993 2.65066C8.21789 2.45686 8.36617 2.3094 8.47476 2.20829C8.62513 2.05662 8.71911 1.93234 8.7567 1.83544C8.79429 1.73854 8.75879 1.63532 8.65019 1.52578C8.57501 1.44995 8.48521 1.35726 8.38079 1.24773C8.27637 1.13819 8.18239 1.04129 8.09885 0.957027C7.95684 0.813785 7.90463 0.687395 7.94222 0.577856C7.97981 0.468318 8.10303 0.40091 8.31187 0.375632C8.52071 0.350354 8.76088 0.320863 9.03237 0.287159C9.30386 0.253455 9.58162 0.221857 9.86565 0.192366C10.1497 0.162875 10.4274 0.131277 10.6989 0.0975733C10.9704 0.0638692 11.2189 0.0343782 11.4445 0.00910011Z"
         fill="#000000"
@@ -130,9 +144,28 @@ const Arrow: React.FC<{
   direction: 'up' | 'right' | 'down' | 'left';
   compact?: boolean;
   compactScale?: number;
-}> = ({direction, compact = false, compactScale = 1}) => {
-  const compactOffset = Math.round(17 * compactScale);
-  const iconSize = Math.round((compact ? 20 : 28) * compactScale);
+  shellSize: number;
+  disabled?: boolean;
+  onPressIn?: () => void;
+  onPressOut?: () => void;
+}> = ({
+  direction,
+  compact = false,
+  compactScale = 1,
+  shellSize,
+  disabled = false,
+  onPressIn,
+  onPressOut,
+}) => {
+  const centerOuterSize = shellSize * (79 / 185);
+  const directionButtonSize = compact ? Math.round(34 * compactScale) : 42;
+  const iconSize = compact ? Math.round(28 * compactScale) : 35;
+  const shellRadius = shellSize / 2;
+  const centerRadius = centerOuterSize / 2;
+  const directionTrackRadius =
+    centerRadius + (shellRadius - centerRadius) * (compact ? 0.42 : 0.35);
+  const crossAxisOffset = shellRadius - directionButtonSize / 2;
+  const edgeOffset = shellRadius - directionButtonSize / 2 - directionTrackRadius;
   const rotations = {
     up: '0deg',
     right: '90deg',
@@ -140,17 +173,26 @@ const Arrow: React.FC<{
     left: '270deg',
   } as const;
   const positions = {
-    up: compact ? {top: compactOffset} : styles.arrowUp,
-    right: compact ? {right: compactOffset} : styles.arrowRight,
-    down: compact ? {bottom: compactOffset} : styles.arrowDown,
-    left: compact ? {left: compactOffset} : styles.arrowLeft,
+    up: {top: edgeOffset, left: crossAxisOffset},
+    right: {right: edgeOffset, top: crossAxisOffset},
+    down: {bottom: edgeOffset, left: crossAxisOffset},
+    left: {left: edgeOffset, top: crossAxisOffset},
   } as const;
 
   return (
-    <View
+    <TouchableOpacity
+      activeOpacity={0.8}
+      disabled={disabled}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
       style={[
         styles.arrowWrapper,
         positions[direction],
+        {
+          width: directionButtonSize,
+          height: directionButtonSize,
+          borderRadius: directionButtonSize / 2,
+        },
         {transform: [{rotate: rotations[direction]}]},
       ]}>
       <Svg width={iconSize} height={iconSize} viewBox="0 0 28 28" fill="none">
@@ -159,102 +201,169 @@ const Arrow: React.FC<{
           fill={COLORS.green}
         />
       </Svg>
-    </View>
+    </TouchableOpacity>
   );
 };
 
-const JoystickPad: React.FC<{compact?: boolean; compactScale?: number}> = ({
+const JoystickPad: React.FC<{
+  compact?: boolean;
+  compactScale?: number;
+  shellSize: number;
+  disabled?: boolean;
+  onArrowPressIn: (servoId: number, direction: number) => void;
+  onArrowPressOut: (servoId: number) => void;
+}> = ({
   compact = false,
   compactScale = 1,
+  shellSize,
+  disabled = false,
+  onArrowPressIn,
+  onArrowPressOut,
 }) => {
-  const compactShellSize = Math.round(150 * compactScale);
-  const compactRadius = Math.round(compactShellSize / 2);
-  const compactCenterSize = Math.round(64 * compactScale);
-  const compactCenterRadius = Math.round(compactCenterSize / 2);
+  const currentShellSize = compact
+    ? Math.round(150 * compactScale)
+    : shellSize;
+  const currentRadius = Math.round(currentShellSize / 2);
+  const currentCenterSize = Math.round(currentShellSize * (79 / 185));
+  const currentCenterRadius = Math.round(currentCenterSize / 2);
+  const currentRingSize = Math.round(currentShellSize * (51.12 / 185));
+  const currentRingRadius = Math.round(currentRingSize / 2);
+  const currentRingBorderWidth = Math.max(
+    6,
+    Math.round(currentShellSize * (8 / 185)),
+  );
 
   return (
     <View
       style={[
         styles.joystickShell,
-        compact && {
-          width: compactShellSize,
-          height: compactShellSize,
-          borderRadius: compactRadius,
+        {
+          width: currentShellSize,
+          height: currentShellSize,
+          borderRadius: currentRadius,
         },
       ]}>
-      <Arrow direction="up" compact={compact} compactScale={compactScale} />
-      <Arrow direction="right" compact={compact} compactScale={compactScale} />
-      <Arrow direction="down" compact={compact} compactScale={compactScale} />
-      <Arrow direction="left" compact={compact} compactScale={compactScale} />
+      <Arrow
+        direction="up"
+        compact={compact}
+        compactScale={compactScale}
+        shellSize={currentShellSize}
+        disabled={disabled}
+        onPressIn={() => onArrowPressIn(1, 1)}
+        onPressOut={() => onArrowPressOut(1)}
+      />
+      <Arrow
+        direction="right"
+        compact={compact}
+        compactScale={compactScale}
+        shellSize={currentShellSize}
+        disabled={disabled}
+        onPressIn={() => onArrowPressIn(0, 1)}
+        onPressOut={() => onArrowPressOut(0)}
+      />
+      <Arrow
+        direction="down"
+        compact={compact}
+        compactScale={compactScale}
+        shellSize={currentShellSize}
+        disabled={disabled}
+        onPressIn={() => onArrowPressIn(1, -1)}
+        onPressOut={() => onArrowPressOut(1)}
+      />
+      <Arrow
+        direction="left"
+        compact={compact}
+        compactScale={compactScale}
+        shellSize={currentShellSize}
+        disabled={disabled}
+        onPressIn={() => onArrowPressIn(0, -1)}
+        onPressOut={() => onArrowPressOut(0)}
+      />
 
       <View
         style={[
           styles.centerOuterCircle,
-          compact && {
-            width: compactCenterSize,
-            height: compactCenterSize,
-            borderRadius: compactCenterRadius,
+          {
+            width: currentCenterSize,
+            height: currentCenterSize,
+            borderRadius: currentCenterRadius,
           },
-        ]}
-      />
+        ]}>
+        <View
+          style={[
+            styles.centerRing,
+            {
+              width: currentRingSize,
+              height: currentRingSize,
+              borderRadius: currentRingRadius,
+              borderWidth: currentRingBorderWidth,
+            },
+          ]}
+        />
+      </View>
     </View>
   );
 };
 
+// 监控页用于展示摄像头预览，并承接底部控制面板和方向操控。
 export const SurveillancePage: React.FC = () => {
   const insets = useSafeAreaInsets();
+  const {
+    windowWidth,
+    heightScale,
+    scaleValue,
+    verticalScaleValue,
+  } = useResponsiveScale();
   const navigation = useNavigation();
+  const {status, sendCommand} = useBluetooth();
   const [isPanelOpen, setIsPanelOpen] = useState(false);
-  const [joystickOffset, setJoystickOffset] = useState({x: 0, y: 0});
+  const [isMicMuted, setIsMicMuted] = useState(false);
   const [bottomAreaHeight, setBottomAreaHeight] = useState(FIGMA_BOTTOM_AREA_HEIGHT);
-  const panStartRef = useRef({x: 0, y: 0});
+  const isConnected = status === BluetoothStatus.Connected;
+
+  // 页面关键尺寸按统一响应式规则换算
+  const headerSideInset = scaleValue(30, 26, 32);
+  const horizontalPadding = scaleValue(20, 18, 24);
+  const cameraHeight = verticalScaleValue(273, 248, 292);
+  const closedJoystickSize = Math.min(scaleValue(250, 224, 268), windowWidth * 0.64);
+  const closedJoystickPaddingTop = verticalScaleValue(34, 28, 40);
+  // 展开态按底部区域的实际高度做比例换算，
+  // 这样不同机型下控制区的上下关系会更接近设计稿。
   const bottomAreaScale = Math.min(
-    Math.max(bottomAreaHeight / FIGMA_BOTTOM_AREA_HEIGHT, 0.92),
+    Math.max((bottomAreaHeight / FIGMA_BOTTOM_AREA_HEIGHT) * heightScale, 0.92),
     1.08,
   );
   const openSheetHeight = Math.round(BOTTOM_SHEET_HEIGHT * bottomAreaScale);
   const openControlsBottom = Math.round(FIGMA_OPEN_CONTROLS_BOTTOM * bottomAreaScale);
-  const openJoystickPaddingTop = Math.round(32 * bottomAreaScale);
+  const openJoystickPaddingTop = Math.round(verticalScaleValue(32, 26, 36) * bottomAreaScale);
   const compactJoystickScale = Math.min(Math.max(bottomAreaScale, 0.94), 1.06);
   const joystickShellSize = isPanelOpen
     ? Math.round(150 * compactJoystickScale)
-    : 250;
-  const joystickCenter = joystickShellSize / 2;
-  const joystickMaxDistance = isPanelOpen
-    ? Math.round(COMPACT_JOYSTICK_MAX_DISTANCE * compactJoystickScale)
-    : DEFAULT_JOYSTICK_MAX_DISTANCE;
+    : closedJoystickSize;
+  const closedControlsBottom = insets.bottom + verticalScaleValue(CLOSED_CONTROLS_BOTTOM, 24, 34);
+  const expandRight = scaleValue(36, 28, 38);
+  const expandBottom = verticalScaleValue(16, 12, 20);
+  const otherImageSize = scaleValue(85, 76, 88);
+  // 轮盘方向控制和 Motion 页同步：按住方向发送，松手停止。
+  const sendMoveCommand = useCallback(
+    async (servoId: number, direction: number) => {
+      if (!isConnected) {
+        return;
+      }
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        panStartRef.current = joystickOffset;
-      },
-      onPanResponderMove: (_, gestureState) => {
-        const nextX = panStartRef.current.x + gestureState.dx;
-        const nextY = panStartRef.current.y + gestureState.dy;
-        const distance = Math.sqrt(nextX * nextX + nextY * nextY);
-
-        if (distance <= joystickMaxDistance) {
-          setJoystickOffset({x: nextX, y: nextY});
-          return;
-        }
-
-        const angle = Math.atan2(nextY, nextX);
-        setJoystickOffset({
-          x: Math.cos(angle) * joystickMaxDistance,
-          y: Math.sin(angle) * joystickMaxDistance,
+      try {
+        await sendCommand({
+          data: COMMANDS.SERVO_MOVE(servoId, direction),
+          serviceUUID: BLUETOOTH_UUIDS.SERVICE_UUID,
+          characteristicUUID: BLUETOOTH_UUIDS.SERVO_CTRL,
+          type: 'response',
         });
-      },
-      onPanResponderRelease: () => {
-        setJoystickOffset({x: 0, y: 0});
-      },
-      onPanResponderTerminate: () => {
-        setJoystickOffset({x: 0, y: 0});
-      },
-    }),
-  ).current;
+      } catch {
+        // 方向控制是高频交互，命令失败时这里不弹提示，避免打断操作。
+      }
+    },
+    [isConnected, sendCommand],
+  );
 
   const handleBottomAreaLayout = (event: LayoutChangeEvent) => {
     const nextHeight = Math.round(event.nativeEvent.layout.height);
@@ -280,122 +389,109 @@ export const SurveillancePage: React.FC = () => {
   return (
     <View style={styles.container}>
       <View style={{height: insets.top, backgroundColor: COLORS.white}} />
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <TouchableOpacity
-            style={styles.headerButton}
-            onPress={() => navigation.goBack()}
-            activeOpacity={0.8}>
-            <BackIcon />
-          </TouchableOpacity>
-
-          <Text style={styles.headerTitle}>Surveillance</Text>
-        </View>
-      </View>
+      {/* 公共页眉 */}
+      <WatcherHeader
+        title="Surveillance"
+        onBack={() => navigation.goBack()}
+        sideInset={headerSideInset}
+      />
 
       <ImageBackground
         source={{uri: CAMERA_IMAGE}}
-        style={styles.cameraContainer}
+        style={[styles.cameraContainer, {height: cameraHeight}]}
         imageStyle={styles.cameraImage}
         resizeMode="cover">
+        {/* 摄像头预览右下角放大按钮 */}
         <View style={styles.cameraFallback} />
-        <TouchableOpacity style={styles.expandButton} activeOpacity={0.85}>
+        <TouchableOpacity
+          style={[
+            styles.expandButton,
+            {marginRight: expandRight, marginBottom: expandBottom},
+          ]}
+          activeOpacity={0.85}>
           <ExpandIcon />
         </TouchableOpacity>
       </ImageBackground>
 
       <View style={styles.bottomArea} onLayout={handleBottomAreaLayout}>
+        {/* 上半部分摇杆区域 */}
         <View
           style={[
             styles.joystickSection,
             isPanelOpen && styles.joystickSectionOpen,
-            isPanelOpen && {paddingTop: openJoystickPaddingTop},
+            {paddingTop: isPanelOpen ? openJoystickPaddingTop : closedJoystickPaddingTop},
           ]}>
-          <View
-            style={styles.joystickGestureLayer}
-            collapsable={false}
-            {...panResponder.panHandlers}>
-            <JoystickPad compact={isPanelOpen} compactScale={compactJoystickScale} />
-            <View
-              pointerEvents="none"
-              style={[
-                styles.joystickKnobOverlay,
-                {
-                  left: joystickCenter - JOYSTICK_KNOB_RADIUS + joystickOffset.x,
-                  top: joystickCenter - JOYSTICK_KNOB_RADIUS + joystickOffset.y,
-                },
-              ]}>
-              <Svg width={60} height={60} viewBox="0 0 60 60" fill="none">
-                <Defs>
-                  <LinearGradient id="surveillanceKnobGradient" x1="30" y1="8" x2="30" y2="52">
-                    <Stop offset="0" stopColor={COLORS.greenDark} />
-                    <Stop offset="1" stopColor={COLORS.green} />
-                  </LinearGradient>
-                </Defs>
-                <Ellipse cx={30} cy={30} rx={20} ry={20} fill={COLORS.white} />
-                <Ellipse
-                  cx={30}
-                  cy={30}
-                  rx={15.5}
-                  ry={15.5}
-                  stroke="url(#surveillanceKnobGradient)"
-                  strokeWidth={8}
-                />
-              </Svg>
-            </View>
+          <View style={styles.joystickGestureLayer}>
+            <JoystickPad
+              compact={isPanelOpen}
+              compactScale={compactJoystickScale}
+              shellSize={joystickShellSize}
+              disabled={!isConnected}
+              onArrowPressIn={sendMoveCommand}
+              onArrowPressOut={(servoId: number) => sendMoveCommand(servoId, 0)}
+            />
           </View>
         </View>
 
+        {/* 底部控制按钮 */}
         <View
           style={[
             styles.controlsRow,
-            isPanelOpen
-              ? {bottom: openControlsBottom}
-              : {bottom: insets.bottom + CLOSED_CONTROLS_BOTTOM},
+            isPanelOpen ? {bottom: openControlsBottom} : {bottom: closedControlsBottom},
           ]}>
-          <TouchableOpacity style={styles.smallControl} activeOpacity={0.8}>
-            <MicrophoneIcon />
+          <TouchableOpacity
+            style={styles.smallControlButton}
+            activeOpacity={0.85}
+            onPress={() => setIsMicMuted(current => !current)}>
+            {isMicMuted ? <MutedMicrophoneIcon /> : <MicrophoneIcon />}
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.captureButton}
-            activeOpacity={0.8}
+            style={styles.mainControlButton}
+            activeOpacity={0.88}
             onPress={handleTogglePanel}>
             <FaceIcon color={isPanelOpen ? COLORS.green : '#0D0D0D'} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.smallControl} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.smallControlButton} activeOpacity={0.85}>
             <SpeakerIcon />
           </TouchableOpacity>
-          </View>
+        </View>
 
-        {isPanelOpen && (
+        {isPanelOpen ? (
+          /* 展开后显示底部 Other 抽屉 */
           <View
             style={[
               styles.bottomSheet,
               {
                 height: openSheetHeight,
+                left: horizontalPadding,
+                right: horizontalPadding,
               },
             ]}>
-            <Text style={styles.bottomSheetTitle}>Other</Text>
+            <Text style={styles.otherTitle}>Other</Text>
+
             <ScrollView
-              style={styles.bottomSheetScroll}
-              contentContainerStyle={[styles.otherGrid, {paddingBottom: insets.bottom + 16}]}
+              contentContainerStyle={[
+                styles.otherGrid,
+                {paddingBottom: insets.bottom + 16},
+              ]}
               showsVerticalScrollIndicator={false}>
               {OTHER_ITEMS.map(item => (
-                <TouchableOpacity key={item.title} style={styles.otherItem} activeOpacity={0.8}>
-                  <Image source={{uri: item.image}} style={styles.otherItemImage} resizeMode="contain" />
-                  <Text
-                    style={styles.otherItemLabel}
-                    numberOfLines={1}
-                    ellipsizeMode="tail">
+                <TouchableOpacity key={item.title} style={styles.otherItem} activeOpacity={0.85}>
+                  <Image
+                    source={{uri: item.image}}
+                    style={[styles.otherImage, {width: otherImageSize, height: otherImageSize}]}
+                    resizeMode="contain"
+                  />
+                  <Text style={styles.otherLabel} numberOfLines={2}>
                     {item.title}
                   </Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
           </View>
-        )}
+        ) : null}
       </View>
     </View>
   );
@@ -406,41 +502,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  header: {
-    height: 44,
-    paddingHorizontal: 30,
-    backgroundColor: COLORS.white,
-    justifyContent: 'center',
-  },
-  headerContent: {
-    width: '100%',
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  headerButton: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    width: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontFamily: 'SF Pro',
-    fontSize: 18,
-    lineHeight: 18,
-    fontWeight: '500',
-    color: '#1A1A1A',
-    textAlign: 'center',
-  },
   cameraContainer: {
     width: '100%',
-    height: 273,
     justifyContent: 'flex-end',
-    alignItems: 'flex-end',
+    overflow: 'hidden',
     backgroundColor: COLORS.cameraFallback,
   },
   cameraImage: {
@@ -452,89 +517,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   expandButton: {
-    width: 24,
-    height: 24,
-    marginRight: 36,
-    marginBottom: 16,
-    zIndex: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
+    alignSelf: 'flex-end',
   },
   expandIconCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  bottomArea: {
-    flex: 1,
-    position: 'relative',
-  },
-  joystickSection: {
-    alignItems: 'center',
-    paddingTop: 32,
-    paddingHorizontal: 20,
-  },
-  joystickSectionOpen: {
-    paddingTop: 32,
-  },
-  joystickGestureLayer: {
-    position: 'relative',
-  },
-  joystickShell: {
-    width: 250,
-    height: 250,
-    borderRadius: 125,
-    backgroundColor: COLORS.white,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  joystickKnobOverlay: {
-    position: 'absolute',
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: COLORS.lightRing,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  arrowWrapper: {
-    position: 'absolute',
-  },
-  arrowUp: {
-    top: 28,
-  },
-  arrowRight: {
-    right: 28,
-  },
-  arrowDown: {
-    bottom: 28,
-  },
-  arrowLeft: {
-    left: 28,
-  },
-  centerOuterCircle: {
-    width: 104,
-    height: 104,
-    borderRadius: 52,
-    backgroundColor: COLORS.lightRing,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  controlsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 30,
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    zIndex: 3,
-  },
-  smallControl: {
     width: 32,
     height: 32,
     borderRadius: 16,
@@ -542,62 +527,111 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  captureButton: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
+  bottomArea: {
+    flex: 1,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  joystickSection: {
+    alignItems: 'center',
+  },
+  joystickSectionOpen: {
+    alignItems: 'center',
+  },
+  joystickGestureLayer: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  joystickShell: {
+    backgroundColor: COLORS.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  arrowWrapper: {
+    position: 'absolute',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  centerOuterCircle: {
+    backgroundColor: COLORS.lightRing,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  centerRing: {
+    borderColor: COLORS.green,
+    backgroundColor: 'transparent',
+  },
+  controlsRow: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 28,
+    zIndex: 3,
+  },
+  smallControlButton: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: COLORS.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mainControlButton: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     backgroundColor: COLORS.white,
     justifyContent: 'center',
     alignItems: 'center',
   },
   bottomSheet: {
     position: 'absolute',
-    left: 20,
-    right: 20,
     bottom: 0,
-    height: BOTTOM_SHEET_HEIGHT,
     backgroundColor: COLORS.white,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    paddingTop: 16,
-    paddingHorizontal: 16,
-    zIndex: 2,
-    overflow: 'hidden',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 24,
+    zIndex: 1,
   },
-  bottomSheetTitle: {
+  otherTitle: {
     fontFamily: 'Inter',
     fontSize: 14,
-    lineHeight: 18,
     fontWeight: '500',
-    color: '#000000',
+    lineHeight: 18,
+    color: COLORS.black,
+    marginLeft: 20,
     marginBottom: 16,
-  },
-  bottomSheetScroll: {
-    flex: 1,
   },
   otherGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingBottom: 8,
+    alignItems: 'flex-start',
+    paddingHorizontal: 14,
+    rowGap: 16,
   },
   otherItem: {
     width: '33.3333%',
-    paddingHorizontal: 6,
-    paddingVertical: 12,
     alignItems: 'center',
+    paddingHorizontal: 6,
   },
-  otherItemImage: {
-    width: 85,
-    height: 85,
-    marginBottom: 12,
+  otherImage: {
+    marginBottom: 8,
   },
-  otherItemLabel: {
+  otherLabel: {
     fontFamily: 'Inter',
-    fontSize: 14,
-    lineHeight: 14,
+    fontSize: 12,
     fontWeight: '400',
-    color: '#000000',
+    lineHeight: 14,
+    color: COLORS.black,
     textAlign: 'center',
-    width: '100%',
   },
 });
+
+
+
+

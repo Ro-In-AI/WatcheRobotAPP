@@ -1,7 +1,6 @@
-import React, {useRef, useState} from 'react';
+import React, {useCallback, useState} from 'react';
 import {
   Image,
-  PanResponder,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,8 +10,16 @@ import {
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import Svg, {Defs, Ellipse, LinearGradient, Path, Stop} from 'react-native-svg';
+import Svg, {Path} from 'react-native-svg';
+import {
+  BluetoothStatus,
+  BLUETOOTH_UUIDS,
+  COMMANDS,
+  useBluetooth,
+} from '../../modules/bluetooth';
 import type {WatcherStackParamList} from '../../navigation/AppNavigator';
+import {WatcherHeader} from '../../components/WatcherHeader';
+import {useResponsiveScale} from '../../hooks/useResponsiveScale';
 
 const COLORS = {
   background: '#F5F5F9',
@@ -77,157 +84,288 @@ const DANCE_ITEMS = [
   },
 ];
 
-const JOYSTICK_CENTER = 92.5;
-const JOYSTICK_RADIUS = 30;
-const JOYSTICK_MAX_DISTANCE = 28;
 type MotionNavigationProp = NativeStackNavigationProp<WatcherStackParamList>;
 
-const BackIcon: React.FC = () => (
-  <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-    <Path
-      d="M9.23544 11.9995L17.3905 19.8827C17.8711 20.3481 17.8711 21.1014 17.3905 21.5653C16.9098 22.03 16.13 22.03 15.6494 21.5653L6.62452 12.8406C6.14458 12.376 6.14458 11.6223 6.62452 11.1591L15.6494 2.43481C15.8905 2.20246 16.2055 2.0863 16.5207 2.0863C16.8358 2.0863 17.1509 2.20248 17.3905 2.43555C17.8711 2.90024 17.8711 3.65242 17.3905 4.1171L9.23544 11.9995Z"
-      fill="#000000"
-    />
-  </Svg>
-);
+type ArrowIconProps = {
+  direction: 'up' | 'right' | 'down' | 'left';
+};
 
-const Arrow: React.FC<{direction: 'up' | 'right' | 'down' | 'left'}> = ({direction}) => {
+const ArrowIcon: React.FC<ArrowIconProps> = ({direction}) => {
   const rotation = {
     up: '0deg',
     right: '90deg',
     down: '180deg',
     left: '270deg',
   } as const;
-  const position = {
-    up: styles.arrowUp,
-    right: styles.arrowRight,
-    down: styles.arrowDown,
-    left: styles.arrowLeft,
-  } as const;
 
   return (
-    <View style={[styles.arrowWrapper, position[direction], {transform: [{rotate: rotation[direction]}]}]}>
-      <Svg width={24} height={24} viewBox="0 0 28 28" fill="none">
-        <Path
-          d="M14.4301 2.44547C14.6624 2.04312 15.2432 2.04312 15.4756 2.44547L21.2187 12.3933C21.451 12.7956 21.1608 13.2985 20.6969 13.2985H9.2088C8.74494 13.2985 8.45467 12.7956 8.687 12.3933L14.4301 2.44547Z"
-          fill={COLORS.green}
-        />
-      </Svg>
-    </View>
+    <Svg
+      width={35}
+      height={35}
+      viewBox="0 0 28 28"
+      style={{transform: [{rotate: rotation[direction]}]}}>
+      <Path
+        d="M14.4301 2.44547C14.6624 2.04312 15.2432 2.04312 15.4756 2.44547L21.2187 12.3933C21.451 12.7956 21.1608 13.2985 20.6969 13.2985H9.2088C8.74494 13.2985 8.45467 12.7956 8.687 12.3933L14.4301 2.44547Z"
+        fill={COLORS.green}
+      />
+    </Svg>
   );
 };
 
+// 动作控制页负责方向控制和底部动作卡片，是 Watcher 的手动操控入口之一。
 export const MotionPage: React.FC = () => {
   const insets = useSafeAreaInsets();
+  const {windowWidth, scaleValue, verticalScaleValue} = useResponsiveScale();
   const navigation = useNavigation<MotionNavigationProp>();
+  const {status, sendCommand} = useBluetooth();
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
-  const [joystickOffset, setJoystickOffset] = useState({x: 0, y: 0});
-  const panStartRef = useRef({x: 0, y: 0});
+  const isConnected = status === BluetoothStatus.Connected;
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        panStartRef.current = joystickOffset;
-      },
-      onPanResponderMove: (_, gestureState) => {
-        const nextX = panStartRef.current.x + gestureState.dx;
-        const nextY = panStartRef.current.y + gestureState.dy;
-        const distance = Math.sqrt(nextX * nextX + nextY * nextY);
+  // 页面主要尺寸按统一响应式规则换算
+  const horizontalPadding = scaleValue(20, 18, 24);
+  const headerSideInset = scaleValue(30, 26, 32);
+  const contentWidth = windowWidth - horizontalPadding * 2;
+  const robotTop = verticalScaleValue(24, 20, 28);
+  const robotBottom = verticalScaleValue(17, 14, 22);
+  const robotWidth = Math.min(scaleValue(171, 158, 182), contentWidth * 0.52);
+  const robotHeight = Math.min(scaleValue(196, 182, 210), contentWidth * 0.6);
+  const cardTopPadding = verticalScaleValue(20, 18, 24);
+  const joystickTop = verticalScaleValue(24, 20, 28);
+  const joystickBottom = verticalScaleValue(20, 16, 24);
+  const joystickShellSize = 185;
+  const joystickCenterOuterSize = joystickShellSize * (79 / 185);
+  const joystickCenterRingSize = joystickShellSize * (51.12 / 185);
+  const danceTop = verticalScaleValue(16, 14, 18);
+  const gridBottomPadding = insets.bottom + verticalScaleValue(16, 12, 22);
+  const gridImageSize = Math.min(
+    scaleValue(85, 76, 88),
+    (contentWidth - 32) / 3 - scaleValue(12, 10, 16),
+  );
+  const directionButtonSize = 42;
+  const joystickOuterRadius = joystickShellSize / 2;
+  const joystickGrayRadius = joystickCenterOuterSize / 2;
+  const directionTrackRadius =
+    joystickGrayRadius + (joystickOuterRadius - joystickGrayRadius) * 0.35;
+  const directionCrossAxisOffset =
+    joystickOuterRadius - directionButtonSize / 2;
+  const directionPositions = {
+    up: {
+      top: joystickOuterRadius - directionButtonSize / 2 - directionTrackRadius,
+      left: directionCrossAxisOffset,
+    },
+    right: {
+      right: joystickOuterRadius - directionButtonSize / 2 - directionTrackRadius,
+      top: directionCrossAxisOffset,
+    },
+    down: {
+      bottom:
+        joystickOuterRadius - directionButtonSize / 2 - directionTrackRadius,
+      left: directionCrossAxisOffset,
+    },
+    left: {
+      left: joystickOuterRadius - directionButtonSize / 2 - directionTrackRadius,
+      top: directionCrossAxisOffset,
+    },
+  } as const;
 
-        if (distance <= JOYSTICK_MAX_DISTANCE) {
-          setJoystickOffset({x: nextX, y: nextY});
-          return;
-        }
+  // 复用旧控制页的方向命令：X 轴控制左右，Y 轴控制上下。
+  const sendMoveCommand = useCallback(
+    async (servoId: number, direction: number) => {
+      if (!isConnected) {
+        return;
+      }
 
-        const angle = Math.atan2(nextY, nextX);
-        setJoystickOffset({
-          x: Math.cos(angle) * JOYSTICK_MAX_DISTANCE,
-          y: Math.sin(angle) * JOYSTICK_MAX_DISTANCE,
+      try {
+        await sendCommand({
+          data: COMMANDS.SERVO_MOVE(servoId, direction),
+          serviceUUID: BLUETOOTH_UUIDS.SERVICE_UUID,
+          characteristicUUID: BLUETOOTH_UUIDS.SERVO_CTRL,
+          type: 'response',
         });
-      },
-      onPanResponderRelease: () => {
-        setJoystickOffset({x: 0, y: 0});
-      },
-      onPanResponderTerminate: () => {
-        setJoystickOffset({x: 0, y: 0});
-      },
-    }),
-  ).current;
+      } catch {
+        // 方向控制是高频交互，命令失败时这里不弹提示，避免打断操作。
+      }
+    },
+    [isConnected, sendCommand],
+  );
 
   return (
     <View style={styles.container}>
       <View style={{height: insets.top, backgroundColor: COLORS.background}} />
 
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <TouchableOpacity
-            style={styles.headerButton}
-            onPress={() => navigation.goBack()}
-            activeOpacity={0.8}>
-            <BackIcon />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Motion</Text>
-        </View>
-      </View>
+      {/* 公共页眉 */}
+      <WatcherHeader
+        title="Motion"
+        onBack={() => navigation.goBack()}
+        sideInset={headerSideInset}
+        backgroundColor={COLORS.background}
+      />
 
       <View style={styles.content}>
-        <View style={styles.robotSection}>
-          <Image source={{uri: ROBOT_IMAGE}} style={styles.robotImage} resizeMode="contain" />
+        {/* 顶部机器人主视觉 */}
+        <View
+          style={[
+            styles.robotSection,
+            {
+              width: contentWidth,
+              marginTop: robotTop,
+              marginBottom: robotBottom,
+            },
+          ]}>
+          <Image
+            source={{uri: ROBOT_IMAGE}}
+            style={[styles.robotImage, {width: robotWidth, height: robotHeight}]}
+            resizeMode="contain"
+          />
         </View>
 
-        <View style={styles.card}>
+        <View
+          style={[
+            styles.card,
+            {
+              width: contentWidth,
+              paddingTop: cardTopPadding,
+            },
+          ]}>
           <Text style={styles.sectionTitle}>Joystick</Text>
 
-          <View style={styles.joystickSection}>
+          {/* 摇杆控制区 */}
+          <View
+            style={[
+              styles.joystickSection,
+              {paddingTop: joystickTop, paddingBottom: joystickBottom},
+            ]}>
             <View
-              style={styles.joystickShell}
-              collapsable={false}
-              {...panResponder.panHandlers}>
-              <Arrow direction="up" />
-              <Arrow direction="right" />
-              <Arrow direction="down" />
-              <Arrow direction="left" />
-
+              style={[
+                styles.joystickShell,
+                {
+                  width: joystickShellSize,
+                  height: joystickShellSize,
+                  borderRadius: joystickShellSize / 2,
+                },
+              ]}>
+              <View style={styles.joystickBase} />
+              <TouchableOpacity
+                activeOpacity={0.75}
+                disabled={!isConnected}
+                hitSlop={8}
+                onPressIn={() => sendMoveCommand(1, 1)}
+                onPressOut={() => sendMoveCommand(1, 0)}
+                style={[
+                  styles.directionTouchArea,
+                  directionPositions.up,
+                  {
+                    width: directionButtonSize,
+                    height: directionButtonSize,
+                    borderRadius: directionButtonSize / 2,
+                  },
+                ]}
+              >
+                <ArrowIcon direction="up" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.75}
+                disabled={!isConnected}
+                hitSlop={8}
+                onPressIn={() => sendMoveCommand(0, 1)}
+                onPressOut={() => sendMoveCommand(0, 0)}
+                style={[
+                  styles.directionTouchArea,
+                  directionPositions.right,
+                  {
+                    width: directionButtonSize,
+                    height: directionButtonSize,
+                    borderRadius: directionButtonSize / 2,
+                  },
+                ]}
+              >
+                <ArrowIcon direction="right" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.75}
+                disabled={!isConnected}
+                hitSlop={8}
+                onPressIn={() => sendMoveCommand(1, -1)}
+                onPressOut={() => sendMoveCommand(1, 0)}
+                style={[
+                  styles.directionTouchArea,
+                  directionPositions.down,
+                  {
+                    width: directionButtonSize,
+                    height: directionButtonSize,
+                    borderRadius: directionButtonSize / 2,
+                  },
+                ]}
+              >
+                <ArrowIcon direction="down" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.75}
+                disabled={!isConnected}
+                hitSlop={8}
+                onPressIn={() => sendMoveCommand(0, -1)}
+                onPressOut={() => sendMoveCommand(0, 0)}
+                style={[
+                  styles.directionTouchArea,
+                  directionPositions.left,
+                  {
+                    width: directionButtonSize,
+                    height: directionButtonSize,
+                    borderRadius: directionButtonSize / 2,
+                  },
+                ]}
+              >
+                <ArrowIcon direction="left" />
+              </TouchableOpacity>
               <View
                 style={[
-                  styles.joystickKnobOuter,
+                  styles.joystickCenterOuter,
                   {
-                    left: JOYSTICK_CENTER - JOYSTICK_RADIUS + joystickOffset.x,
-                    top: JOYSTICK_CENTER - JOYSTICK_RADIUS + joystickOffset.y,
+                    width: joystickCenterOuterSize,
+                    height: joystickCenterOuterSize,
+                    borderRadius: joystickCenterOuterSize / 2,
                   },
                 ]}>
-                <Svg width={60} height={60} viewBox="0 0 60 60" fill="none">
-                  <Defs>
-                    <LinearGradient id="motionKnobGradient" x1="30" y1="8" x2="30" y2="52">
-                      <Stop offset="0" stopColor={COLORS.greenDark} />
-                      <Stop offset="1" stopColor={COLORS.green} />
-                    </LinearGradient>
-                  </Defs>
-                  <Ellipse cx={30} cy={30} rx={20} ry={20} fill={COLORS.white} />
-                  <Ellipse cx={30} cy={30} rx={15.5} ry={15.5} stroke="url(#motionKnobGradient)" strokeWidth={8} />
-                </Svg>
+                <View
+                  style={[
+                    styles.joystickCenterRing,
+                    {
+                      width: joystickCenterRingSize,
+                      height: joystickCenterRingSize,
+                      borderRadius: joystickCenterRingSize / 2,
+                    },
+                  ]}
+                />
               </View>
             </View>
           </View>
 
           <View style={styles.divider} />
 
+          {/* 底部动作列表 */}
           <View style={styles.danceSection}>
-            <Text style={styles.danceTitle}>Dance</Text>
+            <Text style={[styles.danceTitle, {marginBottom: danceTop}]}>Dance</Text>
 
             <ScrollView
               style={styles.danceScroll}
-              contentContainerStyle={[styles.grid, {paddingBottom: insets.bottom + 16}]}
+              contentContainerStyle={[styles.grid, {paddingBottom: gridBottomPadding}]}
               showsVerticalScrollIndicator={false}>
               {DANCE_ITEMS.map(item => (
                 <TouchableOpacity
                   key={item.id}
-                  style={[styles.gridItem, selectedItem === item.id && styles.gridItemActive]}
+                  style={[
+                    styles.gridItem,
+                    selectedItem === item.id && styles.gridItemActive,
+                  ]}
                   activeOpacity={0.85}
-                  onPress={() => setSelectedItem(current => (current === item.id ? null : item.id))}>
-                  <Image source={{uri: item.image}} style={styles.gridImage} resizeMode="contain" />
+                  onPress={() =>
+                    setSelectedItem(current => (current === item.id ? null : item.id))
+                  }>
+                  <Image
+                    source={{uri: item.image}}
+                    style={[styles.gridImage, {width: gridImageSize, height: gridImageSize}]}
+                    resizeMode="contain"
+                  />
                   <Text style={styles.gridLabel} numberOfLines={1}>
                     {item.title}
                   </Text>
@@ -246,48 +384,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  header: {
-    height: 44,
-    backgroundColor: COLORS.background,
-    paddingHorizontal: 30,
-    justifyContent: 'center',
-  },
-  headerContent: {
-    width: '100%',
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  headerButton: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    width: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontFamily: 'SF Pro',
-    fontSize: 18,
-    lineHeight: 18,
-    fontWeight: '500',
-    color: COLORS.title,
-    textAlign: 'center',
-  },
   content: {
     flex: 1,
-    paddingHorizontal: 20,
+    alignItems: 'center',
   },
   robotSection: {
     alignItems: 'center',
-    paddingTop: 24,
-    paddingBottom: 17,
   },
   robotImage: {
-    width: 171,
-    height: 196,
+    alignSelf: 'center',
   },
   card: {
     flex: 1,
@@ -295,7 +400,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     paddingHorizontal: 16,
-    paddingTop: 20,
   },
   sectionTitle: {
     fontFamily: 'Inter',
@@ -305,60 +409,49 @@ const styles = StyleSheet.create({
     color: COLORS.secondary,
   },
   joystickSection: {
+    width: '100%',
     alignItems: 'center',
-    paddingTop: 24,
-    paddingBottom: 18,
   },
   joystickShell: {
-    width: 185,
-    height: 185,
-    borderRadius: 92.5,
-    backgroundColor: COLORS.white,
     position: 'relative',
-    shadowColor: '#CFCFD7',
-    shadowOffset: {width: 0, height: 0},
-    shadowOpacity: 0.22,
-    shadowRadius: 24,
-    elevation: 6,
-  },
-  arrowWrapper: {
-    position: 'absolute',
-    width: 24,
-    height: 24,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  arrowUp: {
-    top: 19,
-    left: 80.5,
-  },
-  arrowRight: {
-    right: 19,
-    top: 80.5,
-  },
-  arrowDown: {
-    bottom: 19,
-    left: 80.5,
-  },
-  arrowLeft: {
-    left: 19,
-    top: 80.5,
-  },
-  joystickKnobOuter: {
+  joystickBase: {
     position: 'absolute',
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    inset: 0,
+    borderRadius: 999,
+    backgroundColor: COLORS.white,
+    shadowColor: '#CFCFD7',
+    shadowOffset: {width: 0, height: 0},
+    shadowOpacity: 0.16,
+    shadowRadius: 20,
+    elevation: 4,
+  },
+  directionTouchArea: {
+    position: 'absolute',
+    backgroundColor: 'transparent',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  joystickCenterOuter: {
     backgroundColor: COLORS.lightRing,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  joystickCenterRing: {
+    borderWidth: 8,
+    borderColor: COLORS.green,
+    backgroundColor: 'transparent',
+  },
   divider: {
+    width: '100%',
     height: 1,
     backgroundColor: COLORS.divider,
   },
   danceSection: {
     flex: 1,
+    width: '100%',
     paddingTop: 16,
   },
   danceTitle: {
@@ -366,30 +459,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 18,
     fontWeight: '500',
-    color: COLORS.black,
-    marginBottom: 16,
+    color: COLORS.secondary,
   },
   danceScroll: {
     flex: 1,
+    width: '100%',
   },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingBottom: 8,
+    rowGap: 0,
   },
   gridItem: {
     width: '33.3333%',
-    paddingHorizontal: 6,
-    paddingVertical: 12,
-    borderRadius: 12,
     alignItems: 'center',
+    borderRadius: 12,
+    paddingTop: 12,
+    paddingBottom: 12,
+    paddingHorizontal: 13,
   },
   gridItemActive: {
     backgroundColor: '#F3F5F8',
   },
   gridImage: {
-    width: 85,
-    height: 85,
     marginBottom: 12,
   },
   gridLabel: {

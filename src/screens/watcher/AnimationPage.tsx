@@ -10,6 +10,8 @@ import {
 import {useNavigation} from '@react-navigation/native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import Svg, {Path} from 'react-native-svg';
+import {WatcherHeader} from '../../components/WatcherHeader';
+import {useResponsiveScale} from '../../hooks/useResponsiveScale';
 
 const COLORS = {
   background: '#F0F0F6',
@@ -20,8 +22,6 @@ const COLORS = {
   green: '#8FC31F',
   thumbBorder: '#0F0F10',
 };
-
-const THUMBNAIL_SIZE = 54;
 
 type ThumbnailItem =
   | {type: 'image'; uri: string}
@@ -128,92 +128,143 @@ const PlayIcon: React.FC = () => (
   </Svg>
 );
 
-const BackIcon: React.FC = () => (
-  <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-    <Path
-      d="M9.23544 11.9995L17.3905 19.8827C17.8711 20.3481 17.8711 21.1014 17.3905 21.5653C16.9098 22.03 16.13 22.03 15.6494 21.5653L6.62452 12.8406C6.14458 12.376 6.14458 11.6223 6.62452 11.1591L15.6494 2.43481C15.8905 2.20246 16.2055 2.0863 16.5207 2.0863C16.8358 2.0863 17.1509 2.20248 17.3905 2.43555C17.8711 2.90024 17.8711 3.65242 17.3905 4.1171L9.23544 11.9995Z"
-      fill="#000000"
-    />
-  </Svg>
-);
-
-const GroupCard: React.FC<{title: string; items: ThumbnailItem[]}> = ({
-  title,
-  items,
-}) => (
-  <View style={styles.card}>
-    <View style={styles.cardHeader}>
-      <Text style={styles.cardTitle}>{title}</Text>
-      <TouchableOpacity style={styles.playButton} activeOpacity={0.8}>
-        <PlayIcon />
-      </TouchableOpacity>
-    </View>
-
-    <View style={styles.thumbnailRow}>
-      {items.map((item, index) => {
-        if (item.type === 'placeholder') {
-          return <View key={`${title}-${index}`} style={styles.placeholder} />;
-        }
-
-        if (item.type === 'composite') {
-          return (
-            <View key={`${title}-${index}`} style={styles.thumbnail}>
-              <Image source={{uri: item.backgroundUri}} style={styles.thumbnailImage} />
-              <Image
-                source={{uri: item.overlayUri}}
-                style={styles.thumbnailOverlay}
-                resizeMode="contain"
-              />
-            </View>
-          );
-        }
-
-        return (
-          <View key={`${title}-${index}`} style={styles.thumbnail}>
-            <Image source={{uri: item.uri}} style={styles.thumbnailImage} />
-          </View>
-        );
-      })}
-    </View>
-  </View>
-);
-
-/**
- * Animation 页面
- */
+// 动画页用于浏览和切换 Watcher 的表情/动作资源分组。
 export const AnimationPage: React.FC = () => {
   const insets = useSafeAreaInsets();
+  const {windowWidth, scaleValue, verticalScaleValue} = useResponsiveScale();
   const navigation = useNavigation();
+
+  // 页面主要尺寸按统一响应式规则换算
+  const horizontalPadding = scaleValue(20, 18, 24);
+  const headerSideInset = scaleValue(30, 26, 32);
+  const topPadding = verticalScaleValue(24, 20, 28);
+  const cardGap = verticalScaleValue(16, 14, 18);
+  const descriptionWidth =
+    windowWidth - horizontalPadding * 2 - scaleValue(16, 12, 16);
+  const contentWidth = windowWidth - horizontalPadding * 2;
+  const thumbSize = Math.min(
+    scaleValue(54, 48, 58),
+    (contentWidth - 32 - 52) / 5,
+  );
+  const overlayTop = Math.round(thumbSize * (17 / 54));
+  const overlayLeft = Math.round(thumbSize * (8 / 54));
+  const overlayWidth = Math.round(thumbSize * (39 / 54));
+  const overlayHeight = Math.round(thumbSize * (19 / 54));
 
   return (
     <View style={styles.container}>
       <View style={{height: insets.top, backgroundColor: COLORS.white}} />
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <TouchableOpacity
-            style={styles.headerButton}
-            onPress={() => navigation.goBack()}
-            activeOpacity={0.8}>
-            <BackIcon />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Anomation</Text>
-        </View>
-      </View>
+      {/* 公共页眉 */}
+      <WatcherHeader
+        title="Anomation"
+        onBack={() => navigation.goBack()}
+        sideInset={headerSideInset}
+      />
 
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={[
           styles.scrollContent,
-          {paddingBottom: insets.bottom + 24},
+          {
+            paddingHorizontal: horizontalPadding,
+            paddingTop: topPadding,
+            paddingBottom: insets.bottom + verticalScaleValue(24, 20, 30),
+          },
         ]}
         showsVerticalScrollIndicator={false}>
-        <Text style={styles.description}>
+        {/* 顶部说明文案 */}
+        <Text style={[styles.description, {width: descriptionWidth}]}>
           {`Feel free to upload your prefer faces to create your\nunique watcher! Make sure the images are:\n- PNG format\n- 412x412 px size\nThe frame rate is 500 ms per image, please design\nyour animation accordingly,`}
         </Text>
 
-        <View style={styles.cardList}>
+        {/* 动画分组卡片列表 */}
+        <View style={[styles.cardList, {gap: cardGap}]}>
           {GROUPS.map(group => (
-            <GroupCard key={group.title} title={group.title} items={group.items} />
+            <View key={group.title} style={[styles.card, {width: contentWidth}]}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardTitle}>{group.title}</Text>
+                <TouchableOpacity style={styles.playButton} activeOpacity={0.8}>
+                  <PlayIcon />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.thumbnailRow}>
+                {group.items.map((item, index) => {
+                  if (item.type === 'placeholder') {
+                    return (
+                      <View
+                        key={`${group.title}-${index}`}
+                        style={[
+                          styles.placeholder,
+                          {
+                            width: thumbSize,
+                            height: thumbSize,
+                            borderRadius: thumbSize * 0.16,
+                          },
+                        ]}
+                      />
+                    );
+                  }
+
+                  if (item.type === 'composite') {
+                    return (
+                      <View
+                        key={`${group.title}-${index}`}
+                        style={[
+                          styles.thumbnail,
+                          {
+                            width: thumbSize,
+                            height: thumbSize,
+                            borderRadius: thumbSize / 2,
+                          },
+                        ]}>
+                        <Image
+                          source={{uri: item.backgroundUri}}
+                          style={[
+                            styles.thumbnailImage,
+                            {borderRadius: thumbSize / 2},
+                          ]}
+                        />
+                        <Image
+                          source={{uri: item.overlayUri}}
+                          style={[
+                            styles.thumbnailOverlay,
+                            {
+                              top: overlayTop,
+                              left: overlayLeft,
+                              width: overlayWidth,
+                              height: overlayHeight,
+                            },
+                          ]}
+                          resizeMode="contain"
+                        />
+                      </View>
+                    );
+                  }
+
+                  return (
+                    <View
+                      key={`${group.title}-${index}`}
+                      style={[
+                        styles.thumbnail,
+                        {
+                          width: thumbSize,
+                          height: thumbSize,
+                          borderRadius: thumbSize / 2,
+                        },
+                      ]}>
+                      <Image
+                        source={{uri: item.uri}}
+                        style={[
+                          styles.thumbnailImage,
+                          {borderRadius: thumbSize / 2},
+                        ]}
+                      />
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
           ))}
         </View>
       </ScrollView>
@@ -226,47 +277,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  header: {
-    backgroundColor: COLORS.white,
-    paddingHorizontal: 30,
-    height: 44,
-    justifyContent: 'center',
-  },
-  headerContent: {
-    width: '100%',
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  headerButton: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    width: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontFamily: 'SF Pro',
-    fontSize: 18,
-    lineHeight: 18,
-    fontWeight: '500',
-    color: COLORS.text,
-    textAlign: 'center',
-  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 24,
+    alignItems: 'center',
   },
   description: {
     fontFamily: 'Inter',
     fontSize: 14,
-    lineHeight: 21,
+    lineHeight: 22,
     fontWeight: '400',
     color: COLORS.muted,
   },
@@ -283,12 +303,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    minHeight: 24,
     marginBottom: 19,
   },
   cardTitle: {
     fontFamily: 'Inter',
     fontSize: 14,
-    lineHeight: 14,
+    lineHeight: 18,
     fontWeight: '400',
     color: COLORS.cardTitle,
   },
@@ -304,9 +325,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   thumbnail: {
-    width: THUMBNAIL_SIZE,
-    height: THUMBNAIL_SIZE,
-    borderRadius: THUMBNAIL_SIZE / 2,
     borderWidth: 1,
     borderColor: COLORS.thumbBorder,
     overflow: 'hidden',
@@ -315,19 +333,11 @@ const styles = StyleSheet.create({
   thumbnailImage: {
     width: '100%',
     height: '100%',
-    borderRadius: THUMBNAIL_SIZE / 2,
   },
   thumbnailOverlay: {
     position: 'absolute',
-    top: 17,
-    left: 8,
-    width: 39,
-    height: 19,
   },
   placeholder: {
-    width: THUMBNAIL_SIZE,
-    height: THUMBNAIL_SIZE,
-    borderRadius: 8.64,
     borderWidth: 1,
     borderColor: COLORS.green,
     borderStyle: 'dashed',
