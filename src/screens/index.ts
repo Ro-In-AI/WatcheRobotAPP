@@ -21,4 +21,4 @@ export {
 export { OldBluetoothPage } from './legacy/OldBluetoothPage';
 export { OldMotionPage } from './legacy/OldMotionPage';
 export { OldControlPage } from './legacy/OldControlPage';
-export { WatcherPage as OldWatcherPage } from './legacy/OldWatcherPage';
+export { WatcherPage as OldWatcherPage } from './tabs/WatcherPage';

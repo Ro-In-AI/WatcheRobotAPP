@@ -31,6 +31,13 @@ import type {
 } from '../utils/visitFlow';
 
 // Watcher 相关页面仍保留在根栈中，方便从任意业务流程直接跳转。
+export type WatcherQrPayload = {
+  bleName?: string;
+  serial?: string;
+  model?: string;
+  rawQrText?: string;
+};
+
 export type WatcherStackParamList = {
   WatcherHome: {connected?: boolean} | undefined;
   Dance: undefined;
@@ -39,7 +46,7 @@ export type WatcherStackParamList = {
   Animation: undefined;
   BindingGuide: undefined;
   ScanCode: undefined;
-  WifiSelect: undefined;
+  WifiSelect: WatcherQrPayload | undefined;
   Notification: undefined;
 };
 
@@ -74,7 +81,7 @@ export type RootStackParamList = {
   Animation: undefined;
   BindingGuide: undefined;
   ScanCode: undefined;
-  WifiSelect: undefined;
+  WifiSelect: WatcherQrPayload | undefined;
   Notification: undefined;
   VisitingSession:
     | {

@@ -3,7 +3,6 @@
  * 基于 ESP32 BLE 机器人协议
  */
 
-import { BLECommands } from '../types';
 import {
   BLUETOOTH_UUIDS,
   SERVO_CONFIG,

@@ -5,7 +5,7 @@
   "services": [
     {
       "name": "RobotService",
-      "uuid": "FF00",
+      "uuid": "00FF",
       "description": "机器人主服务",
       "characteristics": [
         {

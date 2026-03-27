@@ -1,18 +1,22 @@
 ﻿import React, {useEffect, useRef, useState} from 'react';
-import {StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import {Alert, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 import {useIsFocused, useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import Svg, {Path} from 'react-native-svg';
 import {
   Camera,
+  type Code,
   useCameraDevice,
   useCameraPermission,
   useCodeScanner,
 } from 'react-native-vision-camera';
 import {WatcherHeader} from '../../components/WatcherHeader';
 import {useResponsiveScale} from '../../hooks/useResponsiveScale';
-import type {WatcherStackParamList} from '../../navigation/AppNavigator';
+import type {
+  WatcherQrPayload,
+  WatcherStackParamList,
+} from '../../navigation/AppNavigator';
 
 type NavigationProp = NativeStackNavigationProp<WatcherStackParamList, 'ScanCode'>;
 
@@ -61,6 +65,55 @@ const FlashIcon: React.FC = () => (
   </Svg>
 );
 
+const parseWatcherQrPayload = (rawText: string): WatcherQrPayload | null => {
+  const text = rawText.trim();
+  if (!text) {
+    return null;
+  }
+
+  if (text.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(text) as {
+        type?: unknown;
+        bleName?: unknown;
+        serial?: unknown;
+        model?: unknown;
+      };
+
+      if (parsed.type !== undefined && parsed.type !== 'watcher') {
+        return null;
+      }
+
+      const payload: WatcherQrPayload = {
+        rawQrText: text,
+      };
+
+      if (typeof parsed.bleName === 'string' && parsed.bleName.trim()) {
+        payload.bleName = parsed.bleName.trim();
+      }
+      if (typeof parsed.serial === 'string' && parsed.serial.trim()) {
+        payload.serial = parsed.serial.trim();
+      }
+      if (typeof parsed.model === 'string' && parsed.model.trim()) {
+        payload.model = parsed.model.trim();
+      }
+
+      if (!payload.bleName) {
+        return null;
+      }
+
+      return payload;
+    } catch {
+      return null;
+    }
+  }
+
+  return {
+    bleName: text,
+    rawQrText: text,
+  };
+};
+
 // 扫码页用于调用摄像头扫描设备二维码，并继续进入绑定/配网流程。
 export const ScanCodePage: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
@@ -71,6 +124,9 @@ export const ScanCodePage: React.FC = () => {
   const {scaleValue, verticalScaleValue, windowWidth, windowHeight} =
     useResponsiveScale();
   const [permissionRequested, setPermissionRequested] = useState(false);
+  const [scannedPayload, setScannedPayload] = useState<WatcherQrPayload | null>(
+    null,
+  );
   const hasNavigatedRef = useRef(false);
 
   // 页面主要尺寸按统一响应式规则换算
@@ -91,20 +147,40 @@ export const ScanCodePage: React.FC = () => {
     }
   }, [hasPermission, permissionRequested, requestPermission]);
 
-  const handleScanSuccess = () => {
+  const handleScanSuccess = (payload?: WatcherQrPayload) => {
     if (hasNavigatedRef.current) {
       return;
     }
 
     hasNavigatedRef.current = true;
-    navigation.replace('WifiSelect');
+    navigation.replace('WifiSelect', payload);
+  };
+
+  const handleCodeDetected = (code: Code) => {
+    const value = typeof code.value === 'string' ? code.value : '';
+    const payload = parseWatcherQrPayload(value);
+
+    if (!payload) {
+      Alert.alert(
+        'Invalid device QR code',
+        'The QR code does not contain a valid Watcher device payload.',
+      );
+      return;
+    }
+
+    setScannedPayload(payload);
+    handleScanSuccess(payload);
   };
 
   const codeScanner = useCodeScanner({
     codeTypes: ['qr', 'ean-13', 'code-128'],
     onCodeScanned: codes => {
-      if (codes.length > 0) {
-        handleScanSuccess();
+      const matchedCode = codes.find(code => {
+        return typeof code.value === 'string' && code.value.trim().length > 0;
+      });
+
+      if (matchedCode) {
+        handleCodeDetected(matchedCode);
       }
     },
   });
@@ -182,7 +258,7 @@ export const ScanCodePage: React.FC = () => {
           activeOpacity={0.85}
           onPress={
             hasPermission
-              ? () => navigation.navigate('WifiSelect')
+              ? () => navigation.navigate('WifiSelect', scannedPayload ?? undefined)
               : async () => {
                   await requestPermission();
                 }
