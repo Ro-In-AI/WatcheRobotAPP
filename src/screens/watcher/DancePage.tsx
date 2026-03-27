@@ -1,7 +1,6 @@
 import React, {useMemo, useState} from 'react';
 import {
   Image,
-  type ImageSourcePropType,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,6 +14,10 @@ import Svg, {Path, Rect} from 'react-native-svg';
 import {WatcherHeader} from '../../components/WatcherHeader';
 import {useResponsiveScale} from '../../hooks/useResponsiveScale';
 import type {RootStackParamList} from '../../navigation/AppNavigator';
+import {
+  WATCHER_ACTION_ITEMS,
+  type WatcherActionItem,
+} from './watcherActionItems';
 
 const COLORS = {
   background: '#F5F5F9',
@@ -30,59 +33,9 @@ const COLORS = {
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Dance'>;
 type TabType = 'default' | 'customization';
 
-type DanceItem = {
-  id: string;
-  title: string;
-  imageSource: ImageSourcePropType;
-};
+type DanceItem = WatcherActionItem;
 
-const DEFAULT_ITEMS: DanceItem[] = [
-  {
-    id: 'love',
-    title: 'Love',
-    imageSource: require('../../assets/images/dance/love.webp'),
-  },
-  {
-    id: 'error',
-    title: 'Error',
-    imageSource: require('../../assets/images/dance/error.webp'),
-  },
-  {
-    id: 'invoke-tool',
-    title: 'Invoke the tool',
-    imageSource: require('../../assets/images/dance/invoke-tool.webp'),
-  },
-  {
-    id: 'happy',
-    title: 'Happy',
-    imageSource: require('../../assets/images/dance/happy.webp'),
-  },
-  {
-    id: 'sleep',
-    title: 'Sleep',
-    imageSource: require('../../assets/images/dance/sleep.webp'),
-  },
-  {
-    id: 'thinking',
-    title: 'Thinking',
-    imageSource: require('../../assets/images/dance/thinking.webp'),
-  },
-  {
-    id: 'think',
-    title: 'Think',
-    imageSource: require('../../assets/images/dance/think.webp'),
-  },
-  {
-    id: 'speaking',
-    title: 'Speaking',
-    imageSource: require('../../assets/images/dance/speaking.webp'),
-  },
-  {
-    id: 'listen',
-    title: 'listen',
-    imageSource: require('../../assets/images/dance/listen.webp'),
-  },
-];
+const DEFAULT_ITEMS: DanceItem[] = WATCHER_ACTION_ITEMS;
 
 const CUSTOM_ITEMS: DanceItem[] = [
   {

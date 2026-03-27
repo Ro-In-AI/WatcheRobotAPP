@@ -20,6 +20,7 @@ import {
 import type {WatcherStackParamList} from '../../navigation/AppNavigator';
 import {WatcherHeader} from '../../components/WatcherHeader';
 import {useResponsiveScale} from '../../hooks/useResponsiveScale';
+import {WATCHER_ACTION_ITEMS} from './watcherActionItems';
 
 const COLORS = {
   background: '#F5F5F9',
@@ -35,54 +36,6 @@ const COLORS = {
 
 const ROBOT_IMAGE =
   'https://www.figma.com/api/mcp/asset/5fdd0947-93dc-47a3-855c-8261f368c503';
-
-const DANCE_ITEMS = [
-  {
-    id: 'love',
-    title: 'Love',
-    image: 'https://www.figma.com/api/mcp/asset/deac19a8-76c2-4a6f-a830-3e18868805de',
-  },
-  {
-    id: 'error',
-    title: 'Error',
-    image: 'https://www.figma.com/api/mcp/asset/dcc2cccf-5e8f-420f-b1b9-e450551edfd2',
-  },
-  {
-    id: 'invoke',
-    title: 'Invoke the tool',
-    image: 'https://www.figma.com/api/mcp/asset/d270b506-d190-46c3-aa35-900581775b54',
-  },
-  {
-    id: 'happy',
-    title: 'Happy',
-    image: 'https://www.figma.com/api/mcp/asset/2ad79225-70da-4eed-b1d8-e6eaafdffaaa',
-  },
-  {
-    id: 'sleep',
-    title: 'Sleep',
-    image: 'https://www.figma.com/api/mcp/asset/a3ce1c81-0cc2-402d-8a91-9ea11d7f7918',
-  },
-  {
-    id: 'thinking',
-    title: 'Thinking',
-    image: 'https://www.figma.com/api/mcp/asset/48db04a0-dce5-4009-8d98-4fa3c60a9638',
-  },
-  {
-    id: 'think',
-    title: 'Think',
-    image: 'https://www.figma.com/api/mcp/asset/33ded805-a253-4288-bf73-89b119bd4fc1',
-  },
-  {
-    id: 'speaking',
-    title: 'Speaking',
-    image: 'https://www.figma.com/api/mcp/asset/f41f40d0-0d1e-4216-b7a4-870f760f2915',
-  },
-  {
-    id: 'listen',
-    title: 'listen',
-    image: 'https://www.figma.com/api/mcp/asset/ef40f096-146b-4ac2-9931-3f711d4521f5',
-  },
-];
 
 type MotionNavigationProp = NativeStackNavigationProp<WatcherStackParamList>;
 
@@ -350,7 +303,7 @@ export const MotionPage: React.FC = () => {
               style={styles.danceScroll}
               contentContainerStyle={[styles.grid, {paddingBottom: gridBottomPadding}]}
               showsVerticalScrollIndicator={false}>
-              {DANCE_ITEMS.map(item => (
+              {WATCHER_ACTION_ITEMS.map(item => (
                 <TouchableOpacity
                   key={item.id}
                   style={[
@@ -362,7 +315,7 @@ export const MotionPage: React.FC = () => {
                     setSelectedItem(current => (current === item.id ? null : item.id))
                   }>
                   <Image
-                    source={{uri: item.image}}
+                    source={item.imageSource}
                     style={[styles.gridImage, {width: gridImageSize, height: gridImageSize}]}
                     resizeMode="contain"
                   />
