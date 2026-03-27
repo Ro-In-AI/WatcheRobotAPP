@@ -13,6 +13,7 @@ export { BindingGuidePage } from './watcher/BindingGuidePage';
 export { ScanCodePage } from './watcher/ScanCodePage';
 export { WifiSelectPage } from './watcher/WifiSelectPage';
 export { NotificationPage } from './watcher/NotificationPage';
+export { VisitSessionPage } from './watcher/VisitSessionPage';
 
 // Legacy pages (old versions, kept for reference)
 export { OldBluetoothPage } from './legacy/OldBluetoothPage';

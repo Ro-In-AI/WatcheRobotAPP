@@ -9,6 +9,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -32,6 +33,7 @@ import {
 import {bluetoothService} from '../../modules/bluetooth';
 import {useResponsiveScale} from '../../hooks/useResponsiveScale';
 import {STORAGE_KEYS} from '../../utils/storageKeys';
+import type {VisitRequestKind} from '../../utils/visitFlow';
 import type {
   RootStackParamList,
   RootTabParamList,
@@ -42,6 +44,7 @@ type NavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<RootStackParamList>
 >;
 type RouteProps = RouteProp<RootTabParamList, 'Watcher'>;
+type WatcherModalType = 'visitDuration' | 'visitRequest' | null;
 
 const COLORS = {
   background: '#F5F5F9',
@@ -185,6 +188,13 @@ export const WatcherPage: React.FC = () => {
   const [showDeviceMenu, setShowDeviceMenu] = useState(false);
   const [hasCompletedInitialBinding, setHasCompletedInitialBinding] =
     useState(false);
+  const [watcherModal, setWatcherModal] = useState<WatcherModalType>(null);
+  const [watcherRequestKind, setWatcherRequestKind] =
+    useState<VisitRequestKind>('visit');
+  const [watcherRequesterName, setWatcherRequesterName] =
+    useState('Crab A');
+  const [visitTargetName, setVisitTargetName] = useState('Spicy Crab');
+  const [visitDuration, setVisitDuration] = useState('');
 
   // 页面主要尺寸按统一响应式规则换算
   const horizontalPadding = scaleValue(20, 18, 24);
@@ -208,12 +218,17 @@ export const WatcherPage: React.FC = () => {
   const modalButtonGap = scaleValue(20, 16, 20);
   const modalButtonHeight = verticalScaleValue(50, 46, 50);
   const modalTextWidth = modalCardWidth - modalCardPadding * 2;
+  const visitModalWidth = Math.min(
+    contentWidth - scaleValue(9, 0, 12),
+    scaleValue(324, 300, 332),
+  );
   const deviceMenuWidth = scaleValue(130, 124, 130);
   const deviceMenuTop =
     insets.top + sectionTopPadding + verticalScaleValue(54, 48, 58);
   const deviceMenuLeft = horizontalPadding + scaleValue(14, 12, 16);
   const headerTitleInset = scaleValue(8, 6, 10);
 
+  // 首次绑定成功后会从其它页面带着 connected 参数回来，这里负责同步在线状态。
   useEffect(() => {
     if (route.params?.connected) {
       setFailureType(null);
@@ -224,6 +239,38 @@ export const WatcherPage: React.FC = () => {
     }
   }, [navigation, route.params?.connected]);
 
+  // Nearby / 其它页面把访问场景带进来时，这里负责弹出对应的请求或时长弹窗。
+  useEffect(() => {
+    const scenario = route.params?.scenario;
+    if (!scenario) {
+      return;
+    }
+
+    setIsConnected(true);
+    setShowDeviceMenu(false);
+    setWatcherRequesterName(route.params?.requesterName ?? 'Crab A');
+    setVisitTargetName(route.params?.targetName ?? 'Spicy Crab');
+    setWatcherRequestKind(route.params?.requestKind ?? 'visit');
+    setVisitDuration('');
+    setWatcherModal(
+      scenario === 'visitDuration' ? 'visitDuration' : 'visitRequest',
+    );
+
+    navigation.setParams({
+      scenario: undefined,
+      requestKind: undefined,
+      requesterName: undefined,
+      targetName: undefined,
+    });
+  }, [
+    navigation,
+    route.params?.requestKind,
+    route.params?.requesterName,
+    route.params?.scenario,
+    route.params?.targetName,
+  ]);
+
+  // 读取首次绑定标记，决定“连接设备”是否需要先进入绑定引导页。
   useEffect(() => {
     let mounted = true;
 
@@ -255,6 +302,7 @@ export const WatcherPage: React.FC = () => {
       return () => clearTimeout(timer);
     });
 
+  // 连接前需要同时满足蓝牙和 Wi-Fi 条件，这里单独检查 Wi-Fi 状态。
   const checkWifiReady = async () => {
     try {
       const netState = await NetInfo.fetch();
@@ -264,6 +312,7 @@ export const WatcherPage: React.FC = () => {
     }
   };
 
+  // 当连接失败时，优先跳到更精确的系统设置页，帮助用户快速排障。
   const openFailureSettings = async () => {
     try {
       if (Platform.OS === 'android') {
@@ -284,6 +333,7 @@ export const WatcherPage: React.FC = () => {
     }
   };
 
+  // 连接按钮的主流程：未绑定先走引导，已绑定则依次检查蓝牙和 Wi-Fi。
   const handleConnectPress = async () => {
     if (isConnecting) {
       return;
@@ -327,6 +377,7 @@ export const WatcherPage: React.FC = () => {
     }
   };
 
+  // 根据失败类型切换弹窗文案，保持提示和跳转设置页一致。
   const failureCopy =
     failureType === 'bluetooth'
       ? {
@@ -338,6 +389,36 @@ export const WatcherPage: React.FC = () => {
           description: 'Connection failed. Please turn on WIFI.',
           action: 'Toggle on',
         };
+
+  // 访问请求文案会根据 invite / visit 两种来源动态变化。
+  const watcherRequestText =
+    watcherRequestKind === 'invite'
+      ? `[${watcherRequesterName}] Would you like to invite [${visitTargetName}] to visit?`
+      : `[${watcherRequesterName}] Would you like to visit [${visitTargetName}]? Is it allowed?`;
+
+  // 关闭互访相关弹窗时，顺手清掉本次输入的访问时长。
+  const closeWatcherModal = () => {
+    setWatcherModal(null);
+    setVisitDuration('');
+  };
+
+  // 收到访问请求后，允许访问会继续进入“输入访问时长”这一步。
+  const handlePermitWatcherVisit = () => {
+    setWatcherModal('visitDuration');
+  };
+
+  // 确认访问时长后，进入访问中的会话页；如果没填，则走默认文案。
+  const handleConfirmVisitDuration = () => {
+    const normalizedDuration = visitDuration.trim();
+    setWatcherModal(null);
+    setVisitDuration('');
+    navigation.navigate('VisitingSession', {
+      statusText: normalizedDuration
+        ? `[${watcherRequesterName}] is visiting for ${normalizedDuration}...`
+        : `[${watcherRequesterName}] is visiting...`,
+      buttonLabel: 'End the visit.',
+    });
+  };
 
   const cards = [
     {id: 'DANCE', title: 'DANCE', icon: DanceIcon},
@@ -543,6 +624,90 @@ export const WatcherPage: React.FC = () => {
         </View>
       ) : null}
 
+      {/* 互访流程弹窗：包含访问请求确认和访问时长输入两种状态。 */}
+      <Modal
+        visible={watcherModal !== null}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        navigationBarTranslucent
+        presentationStyle="overFullScreen"
+        onRequestClose={closeWatcherModal}>
+        <View
+          style={[
+            styles.modalOverlay,
+            {paddingHorizontal: scaleValue(34, 24, 40)},
+          ]}>
+          <TouchableOpacity
+            style={styles.modalTapArea}
+            activeOpacity={1}
+            onPress={closeWatcherModal}
+          />
+
+          {/* 访问时长弹窗：供当前设备确认允许访问多久。 */}
+          {watcherModal === 'visitDuration' ? (
+            <View style={[styles.visitModalCard, {width: visitModalWidth}]}>
+              <Text style={styles.visitModalTitle}>Visit Duration</Text>
+              <TextInput
+                value={visitDuration}
+                onChangeText={setVisitDuration}
+                placeholder="For example: 5 minutes"
+                placeholderTextColor="#C6CBD1"
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={styles.visitDurationInput}
+              />
+
+              <View style={styles.visitActions}>
+                <TouchableOpacity
+                  style={styles.visitSecondaryButton}
+                  activeOpacity={0.85}
+                  onPress={closeWatcherModal}>
+                  <Text style={styles.visitSecondaryText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.visitPrimaryButton}
+                  activeOpacity={0.85}
+                  onPress={handleConfirmVisitDuration}>
+                  <Text style={styles.visitPrimaryText}>Confirm</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : null}
+
+          {/* 访问请求弹窗：展示来自 Nearby/其它页面的邀请或访问请求。 */}
+          {watcherModal === 'visitRequest' ? (
+            <View style={[styles.visitModalCard, styles.visitRequestCard, {width: visitModalWidth}]}>
+              <Text style={styles.visitModalTitle}>Visiting Request</Text>
+              <Image
+                source={require('../../assets/images/robot_watcher.png')}
+                style={styles.visitRequestRobot}
+                resizeMode="contain"
+              />
+              <Text style={styles.visitRequestCopy}>{watcherRequestText}</Text>
+
+              <View style={styles.visitActions}>
+                <TouchableOpacity
+                  style={styles.visitSecondaryButton}
+                  activeOpacity={0.85}
+                  onPress={closeWatcherModal}>
+                  <Text style={styles.visitSecondaryText}>Refuse</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.visitPrimaryButton}
+                  activeOpacity={0.85}
+                  onPress={handlePermitWatcherVisit}>
+                  <Text style={styles.visitPrimaryText}>Permit</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : null}
+        </View>
+      </Modal>
+
+      {/* 连接失败弹窗：根据蓝牙或 Wi-Fi 缺失给出不同的提示和设置入口。 */}
       <Modal
         visible={failureType !== null}
         transparent
@@ -884,5 +1049,90 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     fontWeight: '600',
     color: COLORS.white,
+  },
+  modalTapArea: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  visitModalCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 14,
+    paddingHorizontal: 20,
+    paddingTop: 22,
+    paddingBottom: 20,
+    alignItems: 'center',
+  },
+  visitRequestCard: {
+    paddingTop: 18,
+  },
+  visitModalTitle: {
+    fontFamily: 'Inter',
+    fontSize: 18,
+    lineHeight: 22,
+    fontWeight: '500',
+    color: COLORS.black,
+    textAlign: 'center',
+  },
+  visitDurationInput: {
+    marginTop: 22,
+    width: '100%',
+    height: 34,
+    borderRadius: 8,
+    backgroundColor: '#F5F5F9',
+    paddingHorizontal: 12,
+    fontFamily: 'Inter',
+    fontSize: 12,
+    lineHeight: 14,
+    fontWeight: '400',
+    color: COLORS.black,
+  },
+  visitActions: {
+    marginTop: 24,
+    width: '100%',
+    flexDirection: 'row',
+    gap: 12,
+  },
+  visitSecondaryButton: {
+    flex: 1,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#F5F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  visitPrimaryButton: {
+    flex: 1,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: COLORS.green,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  visitSecondaryText: {
+    fontFamily: 'Inter',
+    fontSize: 12,
+    lineHeight: 14,
+    fontWeight: '500',
+    color: COLORS.green,
+  },
+  visitPrimaryText: {
+    fontFamily: 'Inter',
+    fontSize: 12,
+    lineHeight: 14,
+    fontWeight: '500',
+    color: COLORS.white,
+  },
+  visitRequestRobot: {
+    marginTop: 16,
+    width: 96,
+    height: 96,
+  },
+  visitRequestCopy: {
+    marginTop: 8,
+    fontFamily: 'Inter',
+    fontSize: 14,
+    lineHeight: 19,
+    fontWeight: '400',
+    color: '#636A74',
+    textAlign: 'center',
   },
 });

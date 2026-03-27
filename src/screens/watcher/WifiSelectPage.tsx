@@ -155,6 +155,7 @@ export const WifiSelectPage: React.FC = () => {
   const getActivePasswordInput = () =>
     showPassword ? visiblePasswordInputRef.current : hiddenPasswordInputRef.current;
 
+  // 选中某个 Wi-Fi 后，先弹出密码输入层并清空上一次输入内容。
   const handleWifiPress = (wifiName: string) => {
     setSelectedWifi(wifiName);
     setPassword('');
@@ -162,11 +163,13 @@ export const WifiSelectPage: React.FC = () => {
     setShowPasswordModal(true);
   };
 
+  // 这里先走演示链路：确认密码后直接展示连接成功弹窗。
   const handleConfirmPassword = () => {
     setShowPasswordModal(false);
     setShowSuccessModal(true);
   };
 
+  // 刷新按钮用旋转动画模拟“重新扫描 Wi-Fi”，并把列表顺序轮换一位。
   const handleRefresh = () => {
     if (isRefreshing) {
       return;
@@ -215,6 +218,7 @@ export const WifiSelectPage: React.FC = () => {
     refreshFrameRef.current = requestAnimationFrame(animateRefresh);
   };
 
+  // 密码显隐切换后，把焦点交给当前可见的输入框，避免输入中断。
   const handleTogglePasswordVisibility = () => {
     const nextShowPassword = !showPassword;
     setShowPassword(nextShowPassword);
@@ -230,6 +234,7 @@ export const WifiSelectPage: React.FC = () => {
     });
   };
 
+  // 绑定完成后写入首次绑定标记，并回到 Watcher 首页展示已连接状态。
   const handleStartUsing = async () => {
     try {
       await AsyncStorage.setItem(
@@ -246,16 +251,16 @@ export const WifiSelectPage: React.FC = () => {
       routes: [
         {
           name: 'MainTabs',
-          params: {connected: true},
-          state: {
-            index: 0,
-            routes: [{name: 'Watcher', params: {connected: true}}],
+          params: {
+            screen: 'Watcher',
+            params: {connected: true},
           },
         },
       ],
     });
   };
 
+  // 密码弹窗出现时执行淡入 + 上移动画，并自动聚焦到输入框。
   useEffect(() => {
     if (!showPasswordModal) {
       passwordOverlayOpacity.setValue(0);
@@ -292,6 +297,7 @@ export const WifiSelectPage: React.FC = () => {
     showPasswordModal,
   ]);
 
+  // 监听键盘高度，避免底部密码弹层被系统键盘遮住。
   useEffect(() => {
     const showEvent =
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -317,6 +323,7 @@ export const WifiSelectPage: React.FC = () => {
     };
   }, [insets.bottom]);
 
+  // 连接成功弹窗使用淡入 + 缩放动画，让成功反馈更明显。
   useEffect(() => {
     if (!showSuccessModal) {
       successOverlayOpacity.setValue(0);
@@ -351,6 +358,7 @@ export const WifiSelectPage: React.FC = () => {
           backgroundColor={COLORS.white}
         />
 
+        {/* 主卡片用于选择局域网，右上角刷新按钮仅做演示扫描效果。 */}
         <View
           style={[
             styles.listCard,
@@ -405,6 +413,7 @@ export const WifiSelectPage: React.FC = () => {
           </View>
         </View>
 
+        {/* 成功弹窗表示设备已连上网络，确认后会回到 Watcher 首页。 */}
         <Modal
           visible={showSuccessModal}
           transparent
@@ -442,6 +451,7 @@ export const WifiSelectPage: React.FC = () => {
         </Modal>
       </View>
 
+      {/* 密码弹窗是绑定流程的中间步骤，用于录入当前 Wi-Fi 密码。 */}
       <Modal
         visible={showPasswordModal}
         transparent
