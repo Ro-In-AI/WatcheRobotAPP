@@ -73,7 +73,10 @@ export const BindingGuidePage: React.FC = () => {
   const previewRobotHeight = previewRobotWidth * (219 / 191);
   const stepsTop = verticalScaleValue(24, 20, 24);
   const buttonTop = verticalScaleValue(56, 42, 60);
-  const buttonBottom = Math.max(insets.bottom + 12, verticalScaleValue(24, 20, 32));
+  const buttonBottom = Math.max(
+    insets.bottom + 12,
+    verticalScaleValue(24, 20, 32),
+  );
   const buttonWidth = Math.min(contentWidth, scaleValue(333, 308, 340));
 
   return (
@@ -85,7 +88,9 @@ export const BindingGuidePage: React.FC = () => {
           styles.scrollContent,
           {paddingBottom: buttonBottom},
         ]}
-        showsVerticalScrollIndicator={false}>
+        scrollEnabled={false}
+        showsVerticalScrollIndicator={false}
+        bounces={false}>
         <View style={styles.container}>
           <WatcherHeader
             title=""
