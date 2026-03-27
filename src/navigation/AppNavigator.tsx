@@ -1,5 +1,8 @@
 import React from 'react';
-import {NavigationContainer} from '@react-navigation/native';
+import {
+  NavigationContainer,
+  NavigatorScreenParams,
+} from '@react-navigation/native';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {StyleSheet, Text, TouchableOpacity, View} from 'react-native';
@@ -17,10 +20,17 @@ import {
   ScanCodePage,
   SurveillancePage,
   UserPage,
+  VisitSessionPage,
   WatcherPage,
   WifiSelectPage,
 } from '../screens';
+import type {
+  NearbyScenario,
+  VisitRequestKind,
+  WatcherScenario,
+} from '../utils/visitFlow';
 
+// Watcher 相关页面仍保留在根栈中，方便从任意业务流程直接跳转。
 export type WatcherStackParamList = {
   WatcherHome: {connected?: boolean} | undefined;
   Dance: undefined;
@@ -33,15 +43,31 @@ export type WatcherStackParamList = {
   Notification: undefined;
 };
 
+// Tab 参数里额外挂载互访场景字段，用来在 Nearby 和 Watcher 之间传递流程状态。
 export type RootTabParamList = {
-  Watcher: {connected?: boolean} | undefined;
-  Nearby: undefined;
+  Watcher:
+    | {
+        connected?: boolean;
+        scenario?: WatcherScenario;
+        requestKind?: VisitRequestKind;
+        requesterName?: string;
+        targetName?: string;
+      }
+    | undefined;
+  Nearby:
+    | {
+        scenario?: NearbyScenario;
+        requesterName?: string;
+        targetName?: string;
+      }
+    | undefined;
   Moments: undefined;
   User: undefined;
 };
 
+// 根栈除了主 Tab 之外，还承接配网页、通知页和“访问中”终态页。
 export type RootStackParamList = {
-  MainTabs: {connected?: boolean} | undefined;
+  MainTabs: NavigatorScreenParams<RootTabParamList> | undefined;
   Dance: undefined;
   Motion: undefined;
   Surveillance: undefined;
@@ -50,6 +76,12 @@ export type RootStackParamList = {
   ScanCode: undefined;
   WifiSelect: undefined;
   Notification: undefined;
+  VisitingSession:
+    | {
+        statusText?: string;
+        buttonLabel?: string;
+      }
+    | undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -73,6 +105,7 @@ const CustomTabBar: React.FC<any> = props => {
   const {state, navigation} = props;
   const insets = useSafeAreaInsets();
 
+  // 自定义底部 TabBar，保持当前设计稿里的悬浮圆角样式。
   const tabBarContent = (
     <View style={styles.tabBar}>
       {state.routes.map((route: any, index: number) => {
@@ -129,6 +162,7 @@ const CustomTabBar: React.FC<any> = props => {
 
 const MainTabs: React.FC = () => {
   return (
+    // 主入口仍然采用四个 Tab，互访流程通过 Watcher / Nearby 的参数进入。
     <Tab.Navigator
       tabBar={props => <CustomTabBar {...props} />}
       screenOptions={{
@@ -144,6 +178,7 @@ const MainTabs: React.FC = () => {
 
 export const AppNavigator: React.FC = () => {
   return (
+    // 根导航统一承接首页 Tab 和若干独立页面，避免跨流程跳转时受 Tab 层级限制。
     <NavigationContainer>
       <Stack.Navigator
         screenOptions={{
@@ -158,6 +193,7 @@ export const AppNavigator: React.FC = () => {
         <Stack.Screen name="ScanCode" component={ScanCodePage} />
         <Stack.Screen name="WifiSelect" component={WifiSelectPage} />
         <Stack.Screen name="Notification" component={NotificationPage} />
+        <Stack.Screen name="VisitingSession" component={VisitSessionPage} />
       </Stack.Navigator>
     </NavigationContainer>
   );

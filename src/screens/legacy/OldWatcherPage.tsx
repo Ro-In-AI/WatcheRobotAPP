@@ -10,8 +10,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
-import { DanceIcon, MotionIcon, SurveillanceIcon } from '../components/icons';
-import { BLEPop, BluetoothStatus, useBluetooth } from '../modules/bluetooth';
+import { DanceIcon, MotionIcon, SurveillanceIcon } from '../../components/icons';
+import { BLEPop, BluetoothStatus, useBluetooth } from '../../modules/bluetooth';
 
 // 设计稿颜色提取
 const COLORS = {
@@ -151,7 +151,7 @@ export const WatcherPage: React.FC = () => {
         <View style={styles.deviceSection}>
           {/* 机器人图片 - 使用真实产品图 */}
           <Image
-            source={require('../assets/images/robot_watcher.png')}
+            source={require('../../assets/images/robot_watcher.png')}
             style={styles.deviceImage}
             resizeMode="contain"
           />

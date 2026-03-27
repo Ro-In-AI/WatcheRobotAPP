@@ -49,6 +49,7 @@ const ScanIcon: React.FC = () => (
   </Svg>
 );
 
+// 绑定引导页用于向用户说明开机、进入 Setup 和扫码绑定的完整步骤。
 export const BindingGuidePage: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const insets = useSafeAreaInsets();

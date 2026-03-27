@@ -61,6 +61,7 @@ const FlashIcon: React.FC = () => (
   </Svg>
 );
 
+// 扫码页用于调用摄像头扫描设备二维码，并继续进入绑定/配网流程。
 export const ScanCodePage: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const isFocused = useIsFocused();

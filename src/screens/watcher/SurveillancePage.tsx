@@ -305,6 +305,7 @@ const JoystickPad: React.FC<{
   );
 };
 
+// 监控页用于展示摄像头预览，并承接底部控制面板和方向操控。
 export const SurveillancePage: React.FC = () => {
   const insets = useSafeAreaInsets();
   const {

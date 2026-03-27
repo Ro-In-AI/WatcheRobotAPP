@@ -1,10 +1,12 @@
 ﻿import React, {useEffect, useRef, useState} from 'react';
 import {
+  Alert,
   Animated,
   Easing,
   Keyboard,
   Modal,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -18,36 +20,63 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import Svg, {Circle, Path} from 'react-native-svg';
 import {WatcherHeader} from '../../components/WatcherHeader';
 import {useResponsiveScale} from '../../hooks/useResponsiveScale';
-import {STORAGE_KEYS} from '../../utils/storageKeys';
 import type {RootStackParamList} from '../../navigation/AppNavigator';
+import {
+  connectToNetwork,
+  requestAndroidWifiPermissions,
+  scanNearbyNetworks,
+  type WifiScanItem,
+} from '../../modules/wifi';
+import {STORAGE_KEYS} from '../../utils/storageKeys';
 
 type NavigationProp = NativeStackNavigationProp<
   RootStackParamList,
   'WifiSelect'
 >;
 
+type WifiConnectResult = {
+  status: 'connected' | 'saved';
+  ssid: string;
+};
+
 const COLORS = {
   background: '#F5F5F9',
   white: '#FFFFFF',
   black: '#000000',
   green: '#8FC31F',
-  overlay: 'rgba(0, 0, 0, 0.65)',
-  line: '#EFF0F1',
-  subText: '#8E959F',
+  greenSoft: '#F3F8E8',
+  border: '#EFF0F1',
+  textSecondary: '#8E959F',
   bodySubText: '#636A74',
+  overlay: 'rgba(0, 0, 0, 0.65)',
   inputBg: '#F5F5F9',
+  error: '#E66A6A',
 };
 
-const wifiOptions = [
-  'Innoxsz-2.4G',
-  'Innoxsz-Public',
-  'Meeting MG',
-  'Innoxsz-Guest',
-  'Innoxsz-Office',
-  'Erroright_5G',
-  'PETPA2.4G',
-  'PETPA5G',
+const MOCK_WIFI_OPTIONS: WifiScanItem[] = [
+  {
+    ssid: 'Innoxsz-2.4G',
+    level: -45,
+    security: 'wpa2',
+    requiresPassword: true,
+    isConnected: false,
+  },
+  {
+    ssid: 'Innoxsz-Public',
+    level: -52,
+    security: 'open',
+    requiresPassword: false,
+    isConnected: false,
+  },
 ];
+
+const getWifiErrorMessage = (error: unknown) => {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return 'Unable to load nearby Wi-Fi networks.';
+};
 
 const WifiIcon: React.FC<{active?: boolean}> = ({active = false}) => (
   <Svg width={16} height={16} viewBox="0 0 16 16" fill="none">
@@ -64,6 +93,33 @@ const RefreshIcon: React.FC = () => (
       d="M4.16967 2.53792C4.20434 2.51659 4.23634 2.49592 4.26501 2.47659C5.36718 1.7298 6.66833 1.33146 7.99967 1.33326C11.6817 1.33326 14.6663 4.31792 14.6663 7.99992C14.6682 9.24711 14.3186 10.4696 13.6577 11.5273C13.6379 11.5589 13.6102 11.5847 13.5773 11.6024C13.5445 11.62 13.5076 11.6288 13.4703 11.6279C13.4331 11.6269 13.3967 11.6163 13.3648 11.597C13.3329 11.5777 13.3065 11.5505 13.2883 11.5179L11.6083 8.49526C11.5801 8.44452 11.5657 8.38729 11.5664 8.32923C11.5671 8.27118 11.5829 8.21431 11.6123 8.16427C11.6418 8.11422 11.6838 8.07274 11.7342 8.04391C11.7846 8.01508 11.8416 7.99992 11.8997 7.99992H13.333C13.3332 7.01395 13.0601 6.0472 12.544 5.20709C12.0279 4.36697 11.289 3.68636 10.4094 3.24086C9.52984 2.79537 8.54397 2.60242 7.56133 2.68346C6.57868 2.7645 5.63774 3.11635 4.84301 3.69992C4.77484 3.74994 4.69682 3.78488 4.61411 3.80242C4.5314 3.81996 4.44591 3.81971 4.36331 3.80168C4.28071 3.78364 4.20289 3.74824 4.13503 3.69783C4.06716 3.64741 4.01079 3.58313 3.96967 3.50926L3.93234 3.44259C3.84783 3.29024 3.82534 3.11117 3.86955 2.94265C3.91376 2.77414 4.02126 2.62917 4.16967 2.53792ZM11.7397 13.5199C10.6364 14.269 9.33319 14.6686 7.99967 14.6666C4.31767 14.6666 1.33301 11.6819 1.33301 7.99992C1.33301 6.75059 1.67701 5.58126 2.27434 4.58192C2.30013 4.53867 2.33685 4.50298 2.38082 4.47844C2.42479 4.45389 2.47444 4.44136 2.52479 4.4421C2.57514 4.44284 2.62441 4.45684 2.66763 4.48267C2.71085 4.5085 2.74651 4.54527 2.77101 4.58926L4.39101 7.50459C4.41922 7.55533 4.4337 7.61256 4.433 7.67062C4.4323 7.72867 4.41644 7.78554 4.38701 7.83558C4.35758 7.88563 4.31558 7.92711 4.26518 7.95594C4.21479 7.98477 4.15773 7.99993 4.09967 7.99992H2.66634C2.66632 8.98624 2.9398 9.95323 3.4564 10.7934C3.97299 11.6336 4.71245 12.3141 5.5926 12.7593C6.47274 13.2044 7.45908 13.3968 8.442 13.315C9.42491 13.2332 10.3659 12.8804 11.1603 12.2959C11.2303 12.2437 11.3104 12.2068 11.3955 12.1875C11.4806 12.1683 11.5688 12.1671 11.6544 12.184C11.74 12.201 11.821 12.2358 11.8923 12.286C11.9636 12.3363 12.0236 12.401 12.0683 12.4759C12.1652 12.6378 12.195 12.8311 12.1512 13.0146C12.1075 13.198 11.9938 13.3572 11.8343 13.4579C11.8029 13.4779 11.7718 13.4983 11.741 13.5193L11.7397 13.5199Z"
       fill="#5D6E7F"
     />
+  </Svg>
+);
+
+const SuccessDecoration: React.FC = () => (
+  <Svg width={132} height={84} viewBox="0 0 132 84" fill="none">
+    <Circle cx="66" cy="40" r="33" fill="#8FC31F" />
+    <Path
+      d="M51 39.5L61.5 50L82 28.5"
+      stroke="white"
+      strokeWidth="6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <Path d="M13 45L0 51L13 57" fill="#8FC31F" />
+    <Path
+      d="M20 53L33 37"
+      stroke="#3A94D8"
+      strokeWidth="4"
+      strokeLinecap="round"
+    />
+    <Path
+      d="M119 29L132 17"
+      stroke="#F0B14B"
+      strokeWidth="4"
+      strokeLinecap="round"
+    />
+    <Circle cx="101" cy="8" r="4" fill="#8FC31F" />
   </Svg>
 );
 
@@ -87,61 +143,32 @@ const VisiblePasswordIcon: React.FC = () => (
   </Svg>
 );
 
-const PasswordDot: React.FC = () => (
-  <Svg width={4} height={4} viewBox="0 0 4 4" fill="none">
-    <Path d="M4 2C4 3.10457 3.10457 4 2 4C0.89543 4 0 3.10457 0 2C0 0.89543 0.89543 0 2 0C3.10457 0 4 0.89543 4 2Z" fill="#000000" />
-  </Svg>
-);
-
-const SuccessDecoration: React.FC = () => (
-  <Svg width={132} height={84} viewBox="0 0 132 84" fill="none">
-    <Circle cx="66" cy="40" r="33" fill="#8FC31F" />
-    <Path
-      d="M51 39.5L61.5 50L82 28.5"
-      stroke="white"
-      strokeWidth="6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <Path d="M13 45L0 51L13 57" fill="#8FC31F" />
-    <Path d="M20 53L33 37" stroke="#3A94D8" strokeWidth="4" strokeLinecap="round" />
-    <Path d="M119 29L132 17" stroke="#F0B14B" strokeWidth="4" strokeLinecap="round" />
-    <Path d="M104 44L116 51" fill="#2E8ED5" />
-    <Path
-      d="M15 12L18 18L25 19L20 24L21 31L15 28L9 31L10 24L5 19L12 18L15 12Z"
-      fill="#F0B14B"
-    />
-    <Path
-      d="M113 53L115 58L120 60L115 62L113 67L111 62L106 60L111 58L113 53Z"
-      fill="#2E8ED5"
-    />
-    <Circle cx="101" cy="8" r="4" fill="#8FC31F" />
-  </Svg>
-);
-
+// 配网页用于扫描手机当前可见的 Wi-Fi，并调用安卓原生能力发起连接。
 export const WifiSelectPage: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const insets = useSafeAreaInsets();
   const {scaleValue, verticalScaleValue, windowWidth} = useResponsiveScale();
-  const visiblePasswordInputRef = useRef<TextInput>(null);
-  const hiddenPasswordInputRef = useRef<TextInput>(null);
-  const refreshFrameRef = useRef<number | null>(null);
-  const refreshStartTimeRef = useRef<number | null>(null);
-  const [selectedWifi, setSelectedWifi] = useState<string | null>(null);
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [passwordKeyboardOffset, setPasswordKeyboardOffset] = useState(0);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [wifiList, setWifiList] = useState(wifiOptions);
-  const [refreshAngle, setRefreshAngle] = useState(0);
-  const passwordOverlayOpacity = useRef(new Animated.Value(0)).current;
-  const passwordSheetTranslateY = useRef(new Animated.Value(28)).current;
+  const passwordInputRef = useRef<TextInput>(null);
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
+  const sheetTranslateY = useRef(new Animated.Value(24)).current;
+  const refreshRotation = useRef(new Animated.Value(0)).current;
   const successOverlayOpacity = useRef(new Animated.Value(0)).current;
   const successCardScale = useRef(new Animated.Value(0.96)).current;
+  const [wifiList, setWifiList] = useState<WifiScanItem[]>([]);
+  const [selectedWifi, setSelectedWifi] = useState<WifiScanItem | null>(null);
+  const [wifiError, setWifiError] = useState<string | null>(null);
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoadingWifiList, setIsLoadingWifiList] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isSubmittingWifi, setIsSubmittingWifi] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [connectResult, setConnectResult] = useState<WifiConnectResult | null>(
+    null,
+  );
+  const [passwordKeyboardOffset, setPasswordKeyboardOffset] = useState(0);
 
-  // 页面主要尺寸按统一响应式规则换算
   const horizontalPadding = scaleValue(20, 18, 24);
   const contentWidth = windowWidth - horizontalPadding * 2;
   const cardWidth = Math.min(contentWidth, scaleValue(353, 326, 360));
@@ -149,84 +176,120 @@ export const WifiSelectPage: React.FC = () => {
   const cardTop = verticalScaleValue(13, 10, 16);
   const rowHeight = verticalScaleValue(48, 44, 48);
   const sheetHeight = verticalScaleValue(320, 300, 320);
+  const successCardWidth = Math.min(contentWidth, scaleValue(324, 304, 330));
   const sheetCardTop = verticalScaleValue(20, 16, 20);
   const sheetActionTop = verticalScaleValue(28, 24, 28);
-  const successCardWidth = Math.min(contentWidth, scaleValue(324, 304, 330));
-  const getActivePasswordInput = () =>
-    showPassword ? visiblePasswordInputRef.current : hiddenPasswordInputRef.current;
 
-  const handleWifiPress = (wifiName: string) => {
-    setSelectedWifi(wifiName);
+  const loadNearbyWifiNetworks = async () => {
+    setWifiError(null);
+    setIsLoadingWifiList(true);
+
+    try {
+      if (Platform.OS !== 'android') {
+        setWifiList(MOCK_WIFI_OPTIONS);
+        return;
+      }
+
+      const granted = await requestAndroidWifiPermissions();
+      if (!granted) {
+        setWifiList([]);
+        setWifiError(
+          'Wi-Fi permission was denied. Please enable location and nearby Wi-Fi access.',
+        );
+        return;
+      }
+
+      const networks = await scanNearbyNetworks();
+      setWifiList(networks);
+      if (networks.length === 0) {
+        setWifiError('No nearby Wi-Fi networks were found.');
+      }
+    } catch (error) {
+      setWifiList([]);
+      setWifiError(getWifiErrorMessage(error));
+    } finally {
+      setIsLoadingWifiList(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  const submitWifiConnection = async (
+    wifi: WifiScanItem,
+    nextPassword?: string,
+  ) => {
+    setIsSubmittingWifi(true);
+    setWifiError(null);
+
+    try {
+      const result: WifiConnectResult =
+        Platform.OS === 'android'
+          ? await connectToNetwork({
+              ssid: wifi.ssid,
+              password: nextPassword?.trim() || undefined,
+              security: wifi.security,
+            })
+          : {status: 'connected', ssid: wifi.ssid};
+
+      setConnectResult(result);
+      setShowPasswordModal(false);
+      setShowSuccessModal(true);
+      setPassword('');
+    } catch (error) {
+      const message = getWifiErrorMessage(error);
+      setWifiError(message);
+      Alert.alert('Wi-Fi connection failed', message);
+    } finally {
+      setIsSubmittingWifi(false);
+    }
+  };
+
+  const handleWifiPress = (wifi: WifiScanItem) => {
+    setSelectedWifi(wifi);
     setPassword('');
     setShowPassword(false);
+
+    if (!wifi.requiresPassword) {
+      void submitWifiConnection(wifi);
+      return;
+    }
+
     setShowPasswordModal(true);
   };
 
   const handleConfirmPassword = () => {
-    setShowPasswordModal(false);
-    setShowSuccessModal(true);
+    if (!selectedWifi) {
+      return;
+    }
+
+    if (selectedWifi.requiresPassword && password.trim().length === 0) {
+      Alert.alert('Password required', 'Please enter the Wi-Fi password.');
+      return;
+    }
+
+    void submitWifiConnection(selectedWifi, password);
+  };
+
+  const handleTogglePasswordVisibility = () => {
+    setShowPassword(current => !current);
+    requestAnimationFrame(() => passwordInputRef.current?.focus());
   };
 
   const handleRefresh = () => {
-    if (isRefreshing) {
+    if (isRefreshing || isLoadingWifiList) {
       return;
     }
 
     setIsRefreshing(true);
-    setRefreshAngle(0);
-    refreshStartTimeRef.current = null;
+    refreshRotation.setValue(0);
 
-    const duration = 760;
-    const easeInOutQuad = (progress: number) =>
-      progress < 0.5
-        ? 2 * progress * progress
-        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-
-    const animateRefresh = (timestamp: number) => {
-      if (refreshStartTimeRef.current === null) {
-        refreshStartTimeRef.current = timestamp;
-      }
-
-      const elapsed = timestamp - refreshStartTimeRef.current;
-      const progress = Math.min(elapsed / duration, 1);
-      const easedProgress = easeInOutQuad(progress);
-
-      setRefreshAngle(360 * easedProgress);
-
-      if (progress < 1) {
-        refreshFrameRef.current = requestAnimationFrame(animateRefresh);
-        return;
-      }
-
-      setWifiList(current => {
-        if (current.length <= 1) {
-          return current;
-        }
-
-        const [first, ...rest] = current;
-        return [...rest, first];
-      });
-      setRefreshAngle(0);
-      setIsRefreshing(false);
-      refreshFrameRef.current = null;
-      refreshStartTimeRef.current = null;
-    };
-
-    refreshFrameRef.current = requestAnimationFrame(animateRefresh);
-  };
-
-  const handleTogglePasswordVisibility = () => {
-    const nextShowPassword = !showPassword;
-    setShowPassword(nextShowPassword);
-
-    requestAnimationFrame(() => {
-      const target = nextShowPassword
-        ? visiblePasswordInputRef.current
-        : hiddenPasswordInputRef.current;
-      target?.focus();
-      target?.setNativeProps({
-        selection: {start: password.length, end: password.length},
-      });
+    Animated.timing(refreshRotation, {
+      toValue: 1,
+      duration: 760,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      refreshRotation.setValue(0);
+      void loadNearbyWifiNetworks();
     });
   };
 
@@ -236,9 +299,7 @@ export const WifiSelectPage: React.FC = () => {
         STORAGE_KEYS.hasCompletedInitialBinding,
         'true',
       );
-    } catch {
-      // 首次绑定标记写入失败时，不阻塞用户继续回到首页。
-    }
+    } catch {}
 
     setShowSuccessModal(false);
     navigation.reset({
@@ -246,10 +307,9 @@ export const WifiSelectPage: React.FC = () => {
       routes: [
         {
           name: 'MainTabs',
-          params: {connected: true},
-          state: {
-            index: 0,
-            routes: [{name: 'Watcher', params: {connected: true}}],
+          params: {
+            screen: 'Watcher',
+            params: {connected: true},
           },
         },
       ],
@@ -257,40 +317,33 @@ export const WifiSelectPage: React.FC = () => {
   };
 
   useEffect(() => {
+    void loadNearbyWifiNetworks();
+  }, []);
+
+  useEffect(() => {
     if (!showPasswordModal) {
-      passwordOverlayOpacity.setValue(0);
-      passwordSheetTranslateY.setValue(28);
+      overlayOpacity.setValue(0);
+      sheetTranslateY.setValue(24);
       setPasswordKeyboardOffset(0);
       return;
     }
 
-    requestAnimationFrame(() => {
-      const target = getActivePasswordInput();
-      target?.focus();
-      target?.setNativeProps({
-        selection: {start: password.length, end: password.length},
-      });
-    });
-
+    requestAnimationFrame(() => passwordInputRef.current?.focus());
     Animated.parallel([
-      Animated.timing(passwordOverlayOpacity, {
+      Animated.timing(overlayOpacity, {
         toValue: 1,
         duration: 220,
         easing: Easing.out(Easing.quad),
         useNativeDriver: true,
       }),
-      Animated.timing(passwordSheetTranslateY, {
+      Animated.timing(sheetTranslateY, {
         toValue: 0,
         duration: 260,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
     ]).start();
-  }, [
-    passwordOverlayOpacity,
-    passwordSheetTranslateY,
-    showPasswordModal,
-  ]);
+  }, [overlayOpacity, sheetTranslateY, showPasswordModal]);
 
   useEffect(() => {
     const showEvent =
@@ -303,15 +356,11 @@ export const WifiSelectPage: React.FC = () => {
         Math.max(0, event.endCoordinates.height - insets.bottom),
       );
     });
-
     const hideSubscription = Keyboard.addListener(hideEvent, () => {
       setPasswordKeyboardOffset(0);
     });
 
     return () => {
-      if (refreshFrameRef.current !== null) {
-        cancelAnimationFrame(refreshFrameRef.current);
-      }
       showSubscription.remove();
       hideSubscription.remove();
     };
@@ -340,6 +389,17 @@ export const WifiSelectPage: React.FC = () => {
     ]).start();
   }, [showSuccessModal, successCardScale, successOverlayOpacity]);
 
+  const successTitle =
+    connectResult?.status === 'saved' ? 'Wi-Fi saved' : 'Connection successful';
+  const successDescription =
+    connectResult?.status === 'saved'
+      ? `System saved Wi-Fi: ${connectResult?.ssid ?? ''}`
+      : `Connected Wi-Fi: ${connectResult?.ssid ?? ''}`;
+  const refreshRotate = refreshRotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
   return (
     <View style={styles.safeArea}>
       <View style={[styles.statusBarSpacer, {height: insets.top}]} />
@@ -350,58 +410,98 @@ export const WifiSelectPage: React.FC = () => {
           sideInset={sideInset}
           backgroundColor={COLORS.white}
         />
-
-        <View
-          style={[
-            styles.listCard,
-            {
-              width: cardWidth,
-              marginTop: cardTop,
-              minHeight: verticalScaleValue(458, 420, 458),
-            },
-          ]}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Select Wi-Fi</Text>
-            <TouchableOpacity
-              style={[
-                styles.refreshIconWrap,
-                isRefreshing && styles.refreshIconWrapActive,
-              ]}
-              activeOpacity={0.75}
-              onPress={handleRefresh}
-              disabled={isRefreshing}>
-              <Animated.View
+        <View style={styles.cardArea}>
+          <View
+            style={[
+              styles.listCard,
+              {
+                width: cardWidth,
+                marginTop: cardTop,
+              },
+            ]}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle}>Select Wi-Fi</Text>
+              <TouchableOpacity
                 style={[
-                  styles.refreshIconInner,
-                  {transform: [{rotate: `${refreshAngle}deg`}]},
-                  isRefreshing && styles.refreshIconInnerRefreshing,
-                ]}>
-                <RefreshIcon />
-              </Animated.View>
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.cardSubtitle}>Only supports 2.4GHz Wi-Fi</Text>
-
-          <View style={styles.listWrap}>
-            {wifiList.map((wifiName, index) => {
-              const active = wifiName === 'PETPA5G';
-              return (
-                <TouchableOpacity
-                  key={wifiName}
+                  styles.refreshIconWrap,
+                  (isRefreshing || isLoadingWifiList) &&
+                    styles.refreshIconWrapActive,
+                ]}
+                activeOpacity={0.75}
+                onPress={handleRefresh}
+                disabled={isRefreshing || isLoadingWifiList}>
+                <Animated.View
                   style={[
-                    styles.wifiRow,
-                    {minHeight: rowHeight},
-                    index === wifiOptions.length - 1 && styles.lastWifiRow,
+                    styles.refreshIconInner,
+                    {transform: [{rotate: refreshRotate}]},
+                    (isRefreshing || isLoadingWifiList) &&
+                      styles.refreshIconInnerRefreshing,
+                  ]}>
+                  <RefreshIcon />
+                </Animated.View>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.cardSubtitle}>
+              Only supports 2.4GHz Wi-Fi
+            </Text>
+
+            <View style={styles.listWrap}>
+              {wifiList.length > 0 ? (
+                <ScrollView
+                  style={styles.listScroll}
+                  contentContainerStyle={[
+                    styles.listScrollContent,
+                    {paddingBottom: insets.bottom + verticalScaleValue(16, 12, 16)},
                   ]}
-                  activeOpacity={0.8}
-                  onPress={() => handleWifiPress(wifiName)}>
-                  <View style={styles.wifiLeft}>
-                    <WifiIcon active={active} />
-                    <Text style={styles.wifiName}>{wifiName}</Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
+                  scrollIndicatorInsets={{bottom: insets.bottom}}
+                  showsVerticalScrollIndicator={false}
+                  bounces={false}>
+                  {wifiList.map((wifi, index) => (
+                    <TouchableOpacity
+                      key={wifi.bssid ?? `${wifi.ssid}-${index}`}
+                      style={[
+                        styles.wifiRow,
+                        {minHeight: rowHeight},
+                        index === wifiList.length - 1 && styles.lastWifiRow,
+                      ]}
+                      activeOpacity={0.85}
+                      onPress={() => handleWifiPress(wifi)}
+                      disabled={isSubmittingWifi}>
+                      <View style={styles.wifiRowContent}>
+                        <View style={styles.wifiLeft}>
+                          <WifiIcon active={wifi.isConnected} />
+                          <Text style={styles.wifiName}>{wifi.ssid}</Text>
+                        </View>
+                      </View>
+                      {index !== wifiList.length - 1 ? (
+                        <View style={styles.wifiDivider} />
+                      ) : null}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              ) : null}
+              {isLoadingWifiList ? (
+                <Text style={styles.emptyStateText}>
+                  Scanning nearby Wi-Fi...
+                </Text>
+              ) : null}
+
+              {!isLoadingWifiList && wifiList.length === 0 ? (
+                <Text
+                  style={[
+                    styles.emptyStateText,
+                    wifiError ? styles.emptyStateError : null,
+                  ]}>
+                  {wifiError ?? 'No Wi-Fi networks found.'}
+                </Text>
+              ) : null}
+
+              {!isLoadingWifiList && wifiList.length > 0 && wifiError ? (
+                <Text style={[styles.inlineErrorText, styles.emptyStateError]}>
+                  {wifiError}
+                </Text>
+              ) : null}
+            </View>
           </View>
         </View>
 
@@ -426,11 +526,8 @@ export const WifiSelectPage: React.FC = () => {
                 },
               ]}>
               <SuccessDecoration />
-              <Text style={styles.successTitle}>Connection successful</Text>
-              <Text style={styles.successDescription}>
-                Connected device: Watcher 0123
-              </Text>
-
+              <Text style={styles.successTitle}>{successTitle}</Text>
+              <Text style={styles.successDescription}>{successDescription}</Text>
               <TouchableOpacity
                 style={styles.successButton}
                 activeOpacity={0.85}
@@ -448,11 +545,7 @@ export const WifiSelectPage: React.FC = () => {
         animationType="none"
         statusBarTranslucent
         onRequestClose={() => setShowPasswordModal(false)}>
-        <Animated.View
-          style={[
-            styles.overlay,
-            {opacity: passwordOverlayOpacity},
-          ]}>
+        <Animated.View style={[styles.overlay, {opacity: overlayOpacity}]}>
           <TouchableOpacity
             style={styles.overlayTapArea}
             activeOpacity={1}
@@ -464,108 +557,56 @@ export const WifiSelectPage: React.FC = () => {
               {
                 height: sheetHeight,
                 marginBottom: passwordKeyboardOffset,
-                transform: [{translateY: passwordSheetTranslateY}],
+                transform: [{translateY: sheetTranslateY}],
               },
             ]}>
             <Text style={styles.sheetTitle}>Enter the password</Text>
-
             <View style={[styles.sheetCard, {marginTop: sheetCardTop}]}>
               <Text style={styles.sheetWifiName}>
-                WiFi name : {selectedWifi ?? ''}
+                Wi-Fi name: {selectedWifi?.ssid ?? ''}
               </Text>
-
-              {showPassword ? (
-                <View style={styles.inputWrap}>
-                  <TextInput
-                    ref={visiblePasswordInputRef}
-                    value={password}
-                    onChangeText={text => {
-                      setPassword(text);
-                      requestAnimationFrame(() => {
-                        visiblePasswordInputRef.current?.setNativeProps({
-                          selection: {start: text.length, end: text.length},
-                        });
-                      });
-                    }}
-                    onFocus={() => {
-                      requestAnimationFrame(() => {
-                        visiblePasswordInputRef.current?.setNativeProps({
-                          selection: {start: password.length, end: password.length},
-                        });
-                      });
-                    }}
-                    placeholder=""
-                    placeholderTextColor="#000000"
-                    secureTextEntry={false}
-                    autoFocus
-                    autoCorrect={false}
-                    spellCheck={false}
-                    autoCapitalize="none"
-                    autoComplete="off"
-                    selectionColor={COLORS.black}
-                    style={styles.passwordInput}
-                  />
-                  <TouchableOpacity
-                    style={styles.eyeHint}
-                    activeOpacity={0.8}
-                    onPress={handleTogglePasswordVisibility}>
-                    <VisiblePasswordIcon />
-                  </TouchableOpacity>
-                </View>
-              ) : (
+              <View style={styles.passwordInputWrap}>
+                <TextInput
+                  ref={passwordInputRef}
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  editable={!isSubmittingWifi}
+                  style={styles.passwordInput}
+                />
                 <TouchableOpacity
-                  style={styles.inputWrap}
-                  activeOpacity={1}
-                  onPress={() => hiddenPasswordInputRef.current?.focus()}>
-                  <TextInput
-                    ref={hiddenPasswordInputRef}
-                    value={password}
-                    onChangeText={setPassword}
-                    placeholder=""
-                    placeholderTextColor="#000000"
-                    secureTextEntry
-                    autoFocus
-                    autoCorrect={false}
-                    spellCheck={false}
-                    autoCapitalize="none"
-                    autoComplete="off"
-                    importantForAutofill="no"
-                    selectionColor="transparent"
-                    caretHidden
-                    contextMenuHidden
-                    style={styles.maskedPasswordInput}
-                  />
-                  <View style={styles.hiddenPasswordMask} pointerEvents="none" />
-                  {password.length > 0 ? (
-                    <View style={styles.passwordDots} pointerEvents="none">
-                      {Array.from({length: password.length}).map((_, index) => (
-                        <PasswordDot key={index} />
-                      ))}
-                    </View>
-                  ) : null}
-                  <View style={styles.hiddenPasswordPlaceholder} />
-                  <TouchableOpacity
-                    style={styles.eyeHint}
-                    activeOpacity={0.8}
-                    onPress={handleTogglePasswordVisibility}>
+                  style={styles.passwordEyeButton}
+                  activeOpacity={0.8}
+                  onPress={handleTogglePasswordVisibility}
+                  disabled={isSubmittingWifi}>
+                  {showPassword ? (
+                    <VisiblePasswordIcon />
+                  ) : (
                     <HiddenPasswordIcon />
-                  </TouchableOpacity>
+                  )}
                 </TouchableOpacity>
-              )}
-
+              </View>
               <View style={[styles.sheetActions, {marginTop: sheetActionTop}]}>
                 <TouchableOpacity
-                  style={styles.secondaryButton}
+                  style={styles.secondaryAction}
                   activeOpacity={0.85}
-                  onPress={() => setShowPasswordModal(false)}>
-                  <Text style={styles.secondaryButtonText}>Cancel</Text>
+                  onPress={() => setShowPasswordModal(false)}
+                  disabled={isSubmittingWifi}>
+                  <Text style={styles.secondaryActionText}>Cancel</Text>
                 </TouchableOpacity>
-
                 <TouchableOpacity
-                  style={styles.primaryButton}
+                  style={[
+                    styles.primaryAction,
+                    isSubmittingWifi && styles.primaryActionDisabled,
+                  ]}
                   activeOpacity={0.85}
-                  onPress={handleConfirmPassword}>
-                  <Text style={styles.primaryButtonText}>Confirm</Text>
+                  onPress={handleConfirmPassword}
+                  disabled={isSubmittingWifi}>
+                  <Text style={styles.primaryActionText}>
+                    {isSubmittingWifi ? 'Connecting...' : 'Confirm'}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -577,19 +618,21 @@ export const WifiSelectPage: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  statusBarSpacer: {
-    backgroundColor: COLORS.white,
-  },
+  safeArea: {flex: 1, backgroundColor: COLORS.background},
+  statusBarSpacer: {backgroundColor: COLORS.white},
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
     alignItems: 'center',
   },
+  cardArea: {
+    flex: 1,
+    width: '100%',
+    alignItems: 'center',
+  },
   listCard: {
+    flex: 1,
+    minHeight: 0,
     backgroundColor: COLORS.white,
     borderRadius: 16,
     paddingHorizontal: 16,
@@ -606,7 +649,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontFamily: 'Inter',
     fontSize: 18,
-    lineHeight: 22,
+    lineHeight: 18,
     fontWeight: '500',
     color: COLORS.black,
     textAlign: 'center',
@@ -636,25 +679,42 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 12,
     fontWeight: '400',
-    color: COLORS.subText,
+    color: COLORS.textSecondary,
     textAlign: 'center',
   },
   listWrap: {
-    marginTop: 32,
+    flex: 1,
+    minHeight: 0,
+    marginTop: 24,
+  },
+  listScroll: {
+    flex: 1,
+  },
+  listScrollContent: {
+    flexGrow: 1,
   },
   wifiRow: {
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.line,
+    position: 'relative',
     justifyContent: 'center',
   },
   lastWifiRow: {
     borderBottomWidth: 0,
   },
+  wifiRowContent: {
+    justifyContent: 'center',
+  },
   wifiLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingLeft: 14,
+  },
+  wifiDivider: {
+    position: 'absolute',
+    left: 28,
+    right: 0,
+    bottom: 0,
+    height: 1,
+    backgroundColor: COLORS.border,
   },
   wifiName: {
     fontFamily: 'Inter',
@@ -662,6 +722,23 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     fontWeight: '400',
     color: COLORS.black,
+  },
+  emptyStateText: {
+    paddingVertical: 24,
+    fontFamily: 'Inter',
+    fontSize: 14,
+    lineHeight: 20,
+    color: COLORS.bodySubText,
+    textAlign: 'center',
+  },
+  emptyStateError: {
+    color: COLORS.error,
+  },
+  inlineErrorText: {
+    paddingTop: 12,
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: 'center',
   },
   overlay: {
     flex: 1,
@@ -696,8 +773,8 @@ const styles = StyleSheet.create({
   },
   sheetCard: {
     width: '100%',
-    backgroundColor: COLORS.white,
     borderRadius: 16,
+    backgroundColor: COLORS.white,
     paddingHorizontal: 16,
     paddingVertical: 16,
   },
@@ -708,107 +785,38 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: COLORS.black,
   },
-  inputWrap: {
-    marginTop: 16,
+  passwordInput: {
     height: 52,
     borderRadius: 8,
     backgroundColor: COLORS.inputBg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    overflow: 'hidden',
-  },
-  passwordInput: {
-    flex: 1,
+    paddingHorizontal: 14,
+    paddingRight: 44,
     fontFamily: 'Inter',
     fontSize: 16,
     lineHeight: 20,
     color: COLORS.black,
     paddingVertical: 0,
-    paddingRight: 44,
   },
-  maskedPasswordInput: {
-    position: 'absolute',
-    left: 12,
-    right: 52,
-    top: 0,
-    bottom: 0,
-    fontFamily: 'Inter',
-    fontSize: 16,
-    lineHeight: 20,
-    color: 'transparent',
-    textShadowColor: 'transparent',
-    backgroundColor: 'transparent',
-    paddingVertical: 0,
-    includeFontPadding: false,
-    textAlignVertical: 'center',
-    zIndex: 0,
+  passwordInputWrap: {
+    marginTop: 16,
+    position: 'relative',
+    justifyContent: 'center',
   },
-  hiddenPasswordInput: {
-    position: 'absolute',
-    left: -9999,
-    width: 1,
-    height: 1,
-    opacity: 0,
-    color: 'transparent',
-    textShadowColor: 'transparent',
-    backgroundColor: 'transparent',
-    paddingVertical: 0,
-  },
-  hiddenPasswordPlaceholder: {
-    flex: 1,
-  },
-  hiddenPasswordMask: {
-    position: 'absolute',
-    left: 12,
-    right: 52,
-    top: 0,
-    bottom: 0,
-    backgroundColor: COLORS.inputBg,
-    zIndex: 1,
-  },
-  passwordDots: {
-    position: 'absolute',
-    left: 12,
-    right: 52,
-    height: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    overflow: 'hidden',
-    zIndex: 2,
-  },
-  eyeHint: {
+  passwordEyeButton: {
     position: 'absolute',
     right: 8,
     top: 10,
-    width: 32,
     height: 32,
-    justifyContent: 'center',
+    width: 32,
     alignItems: 'center',
-    zIndex: 2,
-    elevation: 2,
+    justifyContent: 'center',
   },
   sheetActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: 28,
   },
-  secondaryButton: {
-    width: '47.5%',
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: COLORS.inputBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  secondaryButtonText: {
-    fontFamily: 'Inter',
-    fontSize: 14,
-    lineHeight: 16,
-    fontWeight: '600',
-    color: COLORS.green,
-  },
-  primaryButton: {
+  primaryAction: {
     width: '47.5%',
     height: 50,
     borderRadius: 25,
@@ -816,21 +824,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryButtonText: {
+  primaryActionDisabled: {
+    opacity: 0.7,
+  },
+  primaryActionText: {
     fontFamily: 'Inter',
     fontSize: 14,
     lineHeight: 16,
     fontWeight: '600',
     color: COLORS.white,
   },
+  secondaryAction: {
+    width: '47.5%',
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: COLORS.inputBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryActionText: {
+    fontFamily: 'Inter',
+    fontSize: 14,
+    lineHeight: 16,
+    fontWeight: '600',
+    color: COLORS.green,
+  },
   successCard: {
     alignSelf: 'center',
     borderRadius: 16,
     backgroundColor: COLORS.white,
-    alignItems: 'center',
     paddingHorizontal: 30,
     paddingTop: 30,
     paddingBottom: 28,
+    alignItems: 'center',
   },
   successTitle: {
     marginTop: 24,

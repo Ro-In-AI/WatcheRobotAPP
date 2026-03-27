@@ -9,7 +9,7 @@ import {
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import Svg, {Circle, Path} from 'react-native-svg';
+import Svg, {Circle, Defs, G, Path, ClipPath, Rect} from 'react-native-svg';
 import {WatcherHeader} from '../../components/WatcherHeader';
 import {useResponsiveScale} from '../../hooks/useResponsiveScale';
 import type {RootStackParamList} from '../../navigation/AppNavigator';
@@ -63,9 +63,18 @@ const QuickCommentIcon: React.FC = () => (
 );
 
 const SearchIcon: React.FC = () => (
-  <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-    <Circle cx="11" cy="11" r="6.5" stroke="#000000" strokeWidth={2} />
-    <Path d="M16 16L20 20" stroke="#000000" strokeWidth={2} strokeLinecap="round" />
+  <Svg width={18} height={18} viewBox="0 0 18 18" fill="none">
+    <G clipPath="url(#notification-search-clip)">
+      <Path
+        d="M17.1768 15.9795L14.2518 13.0534C15.3442 11.6934 15.9388 10.0008 15.937 8.25636C15.9373 6.73568 15.4865 5.24908 14.6418 3.98458C13.7971 2.72008 12.5964 1.73448 11.1915 1.15244C9.7866 0.570393 8.24065 0.418045 6.74917 0.714662C5.25769 1.01128 3.88768 1.74354 2.81239 2.81883C1.7371 3.89411 1.00484 5.26413 0.708223 6.75561C0.411606 8.24709 0.563954 9.79303 1.146 11.1979C1.72804 12.6028 2.71364 13.8035 3.97814 14.6483C5.24264 15.493 6.72924 15.9437 8.24993 15.9435C10.0004 15.9456 11.6985 15.3467 13.0604 14.247L15.9843 17.1709C16.0625 17.2516 16.1559 17.3161 16.2591 17.3606C16.3623 17.4051 16.4733 17.4288 16.5857 17.4302C16.6981 17.4317 16.8097 17.4109 16.914 17.3691C17.0184 17.3273 17.1134 17.2653 17.1937 17.1866C17.3512 17.0241 17.4378 16.8058 17.4347 16.5796C17.4315 16.3533 17.3388 16.1375 17.1768 15.9795ZM2.2503 8.25749C2.2503 7.46961 2.40549 6.68944 2.70699 5.96153C3.0085 5.23362 3.45043 4.57223 4.00755 4.01511C4.56467 3.458 5.22606 3.01607 5.95397 2.71456C6.68188 2.41305 7.46204 2.25786 8.24993 2.25786C9.03781 2.25786 9.81798 2.41305 10.5459 2.71456C11.2738 3.01607 11.9352 3.458 12.4923 4.01511C13.0494 4.57223 13.4913 5.23362 13.7929 5.96153C14.0944 6.68944 14.2496 7.46961 14.2495 8.25749C14.2495 9.84884 13.6174 11.375 12.4921 12.5003C11.3669 13.6255 9.84071 14.2577 8.24936 14.2577C6.65801 14.2577 5.13184 13.6255 4.00659 12.5003C2.88134 11.375 2.24918 9.84884 2.24918 8.25749H2.2503Z"
+        fill="black"
+      />
+    </G>
+    <Defs>
+      <ClipPath id="notification-search-clip">
+        <Rect width="18" height="18" fill="white" />
+      </ClipPath>
+    </Defs>
   </Svg>
 );
 
@@ -142,6 +151,7 @@ const NotificationAvatar: React.FC<{type: NoticeItem['type']}> = ({type}) => {
   return type === 'watcher' ? <WatcherAvatar /> : <CrabaAvatar />;
 };
 
+// 通知页目前以静态消息为主，用来承接右上角铃铛入口的视觉展示。
 export const NotificationPage: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const insets = useSafeAreaInsets();
@@ -170,6 +180,7 @@ export const NotificationPage: React.FC = () => {
           }
         />
 
+        {/* 顶部快捷入口用于展示常见消息分类，目前还没有接入真实跳转。 */}
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={[
@@ -204,6 +215,7 @@ export const NotificationPage: React.FC = () => {
             </View>
           </View>
 
+          {/* 下方列表用于集中展示 Notice / Watcher / Crab A 等消息卡片。 */}
           <View style={[styles.listCard, {width: listWidth}]}>
             {noticeItems.map((item, index) => (
               <View
@@ -260,8 +272,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   searchButton: {
-    width: 24,
-    height: 24,
+    width: 18,
+    height: 18,
     justifyContent: 'center',
     alignItems: 'center',
   },

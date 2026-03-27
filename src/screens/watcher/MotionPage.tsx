@@ -112,6 +112,7 @@ const ArrowIcon: React.FC<ArrowIconProps> = ({direction}) => {
   );
 };
 
+// 动作控制页负责方向控制和底部动作卡片，是 Watcher 的手动操控入口之一。
 export const MotionPage: React.FC = () => {
   const insets = useSafeAreaInsets();
   const {windowWidth, scaleValue, verticalScaleValue} = useResponsiveScale();
