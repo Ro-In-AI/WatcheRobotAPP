@@ -25,6 +25,7 @@ type TabType = 'default' | 'customization';
 
 const DEFAULT_ROBOTS = ['Watcher-01', 'Watcher-02', 'Watcher-03'] as const;
 
+// 舞蹈页用于浏览默认/自定义机器人列表，并作为舞蹈内容的展示入口。
 export const DancePage: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();

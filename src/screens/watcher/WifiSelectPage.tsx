@@ -119,6 +119,7 @@ const SuccessDecoration: React.FC = () => (
   </Svg>
 );
 
+// 配网页用于选择 Wi-Fi、输入密码，并在成功后返回 Watcher 首页。
 export const WifiSelectPage: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const insets = useSafeAreaInsets();

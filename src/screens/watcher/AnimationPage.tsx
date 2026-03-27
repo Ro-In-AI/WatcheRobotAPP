@@ -128,6 +128,7 @@ const PlayIcon: React.FC = () => (
   </Svg>
 );
 
+// 动画页用于浏览和切换 Watcher 的表情/动作资源分组。
 export const AnimationPage: React.FC = () => {
   const insets = useSafeAreaInsets();
   const {windowWidth, scaleValue, verticalScaleValue} = useResponsiveScale();

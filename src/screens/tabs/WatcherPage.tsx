@@ -61,6 +61,7 @@ const COLORS = {
 
 type FailureType = 'bluetooth' | 'wifi' | null;
 
+// Watcher 是设备主入口页，负责展示连接状态、功能卡片，以及承接 Nearby 带来的互访流程。
 const LoadingSpinner: React.FC = () => {
   const rotateValue = useRef(new Animated.Value(0)).current;
 
@@ -176,6 +177,7 @@ const DeviceMenuArrow: React.FC = () => (
   </Svg>
 );
 
+// 这个页面同时处理三类职责：设备连接、Watcher 功能入口、互访请求弹窗。
 export const WatcherPage: React.FC = () => {
   const insets = useSafeAreaInsets();
   const {windowWidth, scaleValue, verticalScaleValue} = useResponsiveScale();

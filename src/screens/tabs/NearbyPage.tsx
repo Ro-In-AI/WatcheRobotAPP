@@ -55,6 +55,7 @@ const DEFAULT_DISTANCE = 'Just 100m away';
 const DEFAULT_REQUESTER = 'Crab A';
 const DEFAULT_TARGET = 'Spicy Crab';
 
+// Nearby 是“附近设备互访”的入口页，主要负责发起邀请、访问以及接收附近请求。
 const BellIcon: React.FC = () => (
   <Svg width={18} height={18} viewBox="0 0 14 16" fill="none">
     <Path
@@ -154,6 +155,7 @@ const ModalActionButton: React.FC<{
 );
 
 // Nearby 页负责展示附近设备发现、发起邀请/访问，以及处理来访请求。
+// 这个页面的主体是互访流程编排，页面本身更像一个承接多个弹窗状态的流程入口。
 export const NearbyPage: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProps>();
