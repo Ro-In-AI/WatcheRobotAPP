@@ -232,6 +232,7 @@ class WifiControlModule(
             putString("ssid", result.SSID)
             putString("bssid", result.BSSID)
             putInt("level", result.level)
+            putInt("frequency", result.frequency)
             putString("security", parseSecurity(result.capabilities))
             putBoolean("requiresPassword", !isOpenNetwork(result.capabilities))
             putBoolean("isConnected", currentSsid == result.SSID)

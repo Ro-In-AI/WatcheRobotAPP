@@ -13,6 +13,7 @@ export type WifiScanItem = {
   ssid: string;
   bssid?: string;
   level: number;
+  frequency?: number;
   security: WifiSecurity;
   requiresPassword: boolean;
   isConnected: boolean;

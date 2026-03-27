@@ -3,7 +3,7 @@ import {
   Alert,
   Animated,
   Easing,
-  Keyboard,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   ScrollView,
@@ -13,16 +13,22 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import {useCallback} from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {useNavigation} from '@react-navigation/native';
+import {useNavigation, useRoute} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import type {RouteProp} from '@react-navigation/native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import Svg, {Circle, Path} from 'react-native-svg';
 import {WatcherHeader} from '../../components/WatcherHeader';
+import {
+  BluetoothStatus,
+  useBluetooth,
+  type WifiProvisioningStatus,
+} from '../../modules/bluetooth';
 import {useResponsiveScale} from '../../hooks/useResponsiveScale';
 import type {RootStackParamList} from '../../navigation/AppNavigator';
 import {
-  connectToNetwork,
   requestAndroidWifiPermissions,
   scanNearbyNetworks,
   type WifiScanItem,
@@ -33,10 +39,12 @@ type NavigationProp = NativeStackNavigationProp<
   RootStackParamList,
   'WifiSelect'
 >;
+type RouteProps = RouteProp<RootStackParamList, 'WifiSelect'>;
 
 type WifiConnectResult = {
   status: 'connected' | 'saved';
   ssid: string;
+  ip?: string;
 };
 
 const COLORS = {
@@ -70,12 +78,71 @@ const MOCK_WIFI_OPTIONS: WifiScanItem[] = [
   },
 ];
 
+const PROVISIONING_TIMEOUT_MS = 30000;
+
+const is24GHzNetwork = (network: WifiScanItem) => {
+  if (typeof network.frequency === 'number' && network.frequency > 0) {
+    return network.frequency >= 2400 && network.frequency <= 2500;
+  }
+
+  return !/(^|[_\-\s])5g(hz)?($|[_\-\s])/i.test(network.ssid);
+};
+
+const getFilteredWifiNetworks = (networks: WifiScanItem[]) =>
+  networks.filter(network => !network.isConnected && is24GHzNetwork(network));
+
 const getWifiErrorMessage = (error: unknown) => {
   if (error instanceof Error && error.message) {
     return error.message;
   }
 
   return 'Unable to load nearby Wi-Fi networks.';
+};
+
+const getBluetoothErrorMessage = (error: unknown) => {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return 'Unable to connect to the device over Bluetooth.';
+};
+
+const getProvisioningFailureMessage = (status: WifiProvisioningStatus) => {
+  switch (status.state) {
+    case 'disconnected':
+      return status.ssid
+        ? `Watcher failed to join ${status.ssid}. Check that the password is correct and the network is 2.4GHz.`
+        : 'Watcher failed to join the Wi-Fi network. Check that the password is correct and the network is 2.4GHz.';
+    case 'error':
+      return 'Watcher rejected the Wi-Fi request. Please retry.';
+    default:
+      return 'Watcher did not finish Wi-Fi provisioning.';
+  }
+};
+
+const getProvisioningHintText = (status: WifiProvisioningStatus) => {
+  switch (status.state) {
+    case 'unconfigured':
+      return 'Watcher is waiting for Wi-Fi credentials.';
+    case 'cleared':
+      return 'Stored Wi-Fi credentials were cleared.';
+    case 'connecting':
+      return status.ssid
+        ? `Watcher is connecting to ${status.ssid}...`
+        : 'Watcher is connecting to Wi-Fi...';
+    case 'connected':
+      return status.ip
+        ? `Watcher connected to ${status.ssid ?? 'Wi-Fi'} (${status.ip})`
+        : `Watcher connected to ${status.ssid ?? 'Wi-Fi'}`;
+    case 'disconnected':
+      return status.ssid
+        ? `Watcher could not join ${status.ssid}.`
+        : 'Watcher failed to join Wi-Fi.';
+    case 'error':
+      return 'Watcher reported a Wi-Fi provisioning error.';
+    default:
+      return null;
+  }
 };
 
 const WifiIcon: React.FC<{active?: boolean}> = ({active = false}) => (
@@ -143,12 +210,33 @@ const VisiblePasswordIcon: React.FC = () => (
   </Svg>
 );
 
-// 配网页用于扫描手机当前可见的 Wi-Fi，并调用安卓原生能力发起连接。
+// 配网页用于扫描手机当前可见的 Wi-Fi，并通过 BLE 将凭据下发给设备。
 export const WifiSelectPage: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<RouteProps>();
   const insets = useSafeAreaInsets();
   const {scaleValue, verticalScaleValue, windowWidth} = useResponsiveScale();
+  const {
+    status: bluetoothStatus,
+    error: bluetoothError,
+    clearError: clearBluetoothError,
+    connectToConfiguredDevice,
+    configureWifi,
+    requestWifiStatus,
+    subscribeToProvisioningStatus,
+  } = useBluetooth();
   const passwordInputRef = useRef<TextInput>(null);
+  const bluetoothActionsRef = useRef({
+    clearBluetoothError,
+    connectToConfiguredDevice,
+    requestWifiStatus,
+    subscribeToProvisioningStatus,
+  });
+  const bootstrapKeyRef = useRef<string | null>(null);
+  const provisioningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const pendingWifiSsidRef = useRef<string | null>(null);
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const sheetTranslateY = useRef(new Animated.Value(24)).current;
   const refreshRotation = useRef(new Animated.Value(0)).current;
@@ -161,13 +249,14 @@ export const WifiSelectPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoadingWifiList, setIsLoadingWifiList] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isPreparingDevice, setIsPreparingDevice] = useState(true);
   const [isSubmittingWifi, setIsSubmittingWifi] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [connectResult, setConnectResult] = useState<WifiConnectResult | null>(
     null,
   );
-  const [passwordKeyboardOffset, setPasswordKeyboardOffset] = useState(0);
+  const [provisioningHint, setProvisioningHint] = useState<string | null>(null);
 
   const horizontalPadding = scaleValue(20, 18, 24);
   const contentWidth = windowWidth - horizontalPadding * 2;
@@ -179,8 +268,32 @@ export const WifiSelectPage: React.FC = () => {
   const successCardWidth = Math.min(contentWidth, scaleValue(324, 304, 330));
   const sheetCardTop = verticalScaleValue(20, 16, 20);
   const sheetActionTop = verticalScaleValue(28, 24, 28);
+  const isDeviceConnected = bluetoothStatus === BluetoothStatus.Connected;
+  const targetBleName = route.params?.bleName?.trim() || undefined;
+  const targetDeviceLabel = targetBleName ?? 'Watcher';
 
-  const loadNearbyWifiNetworks = async () => {
+  useEffect(() => {
+    bluetoothActionsRef.current = {
+      clearBluetoothError,
+      connectToConfiguredDevice,
+      requestWifiStatus,
+      subscribeToProvisioningStatus,
+    };
+  }, [
+    clearBluetoothError,
+    connectToConfiguredDevice,
+    requestWifiStatus,
+    subscribeToProvisioningStatus,
+  ]);
+
+  const clearProvisioningTimeout = () => {
+    if (provisioningTimeoutRef.current) {
+      clearTimeout(provisioningTimeoutRef.current);
+      provisioningTimeoutRef.current = null;
+    }
+  };
+
+  const loadNearbyWifiNetworks = useCallback(async () => {
     setWifiError(null);
     setIsLoadingWifiList(true);
 
@@ -200,9 +313,10 @@ export const WifiSelectPage: React.FC = () => {
       }
 
       const networks = await scanNearbyNetworks();
-      setWifiList(networks);
-      if (networks.length === 0) {
-        setWifiError('No nearby Wi-Fi networks were found.');
+      const filteredNetworks = getFilteredWifiNetworks(networks);
+      setWifiList(filteredNetworks);
+      if (filteredNetworks.length === 0) {
+        setWifiError('No nearby 2.4GHz Wi-Fi networks were found.');
       }
     } catch (error) {
       setWifiList([]);
@@ -211,7 +325,39 @@ export const WifiSelectPage: React.FC = () => {
       setIsLoadingWifiList(false);
       setIsRefreshing(false);
     }
-  };
+  }, []);
+
+  const prepareDevice = useCallback(async () => {
+    setIsPreparingDevice(true);
+    setWifiError(null);
+
+    try {
+      bluetoothActionsRef.current.clearBluetoothError();
+
+      if (!isDeviceConnected) {
+        await bluetoothActionsRef.current.connectToConfiguredDevice({
+          deviceName: targetBleName,
+        });
+      }
+      return true;
+    } catch (error) {
+      setWifiList([]);
+      setWifiError(getBluetoothErrorMessage(error));
+      return false;
+    } finally {
+      setIsPreparingDevice(false);
+    }
+  }, [isDeviceConnected, targetBleName]);
+
+  const prepareDeviceAndLoadWifi = useCallback(async () => {
+    const deviceReady = await prepareDevice();
+    if (!deviceReady) {
+      setIsRefreshing(false);
+      return;
+    }
+
+    await loadNearbyWifiNetworks();
+  }, [loadNearbyWifiNetworks, prepareDevice]);
 
   const submitWifiConnection = async (
     wifi: WifiScanItem,
@@ -219,37 +365,58 @@ export const WifiSelectPage: React.FC = () => {
   ) => {
     setIsSubmittingWifi(true);
     setWifiError(null);
+    setProvisioningHint(`Sending ${wifi.ssid} to Watcher...`);
 
     try {
-      const result: WifiConnectResult =
-        Platform.OS === 'android'
-          ? await connectToNetwork({
-              ssid: wifi.ssid,
-              password: nextPassword?.trim() || undefined,
-              security: wifi.security,
-            })
-          : {status: 'connected', ssid: wifi.ssid};
+      if (!isDeviceConnected) {
+        throw new Error('Bluetooth device is not connected.');
+      }
 
-      setConnectResult(result);
+      pendingWifiSsidRef.current = wifi.ssid;
+      clearProvisioningTimeout();
+      provisioningTimeoutRef.current = setTimeout(() => {
+        if (!pendingWifiSsidRef.current) {
+          return;
+        }
+
+        setIsSubmittingWifi(false);
+        setWifiError(
+          `Watcher did not connect to ${pendingWifiSsidRef.current} within 30 seconds.`,
+        );
+        setProvisioningHint(null);
+        pendingWifiSsidRef.current = null;
+      }, PROVISIONING_TIMEOUT_MS);
+
+      await configureWifi({
+        ssid: wifi.ssid,
+        password: nextPassword ?? '',
+      });
+
       setShowPasswordModal(false);
-      setShowSuccessModal(true);
       setPassword('');
     } catch (error) {
+      clearProvisioningTimeout();
+      pendingWifiSsidRef.current = null;
       const message = getWifiErrorMessage(error);
       setWifiError(message);
+      setProvisioningHint(null);
       Alert.alert('Wi-Fi connection failed', message);
-    } finally {
       setIsSubmittingWifi(false);
     }
   };
 
   const handleWifiPress = (wifi: WifiScanItem) => {
+    if (!isDeviceConnected || isPreparingDevice) {
+      setWifiError('Bluetooth is still connecting to Watcher. Please wait.');
+      return;
+    }
+
     setSelectedWifi(wifi);
     setPassword('');
     setShowPassword(false);
 
     if (!wifi.requiresPassword) {
-      void submitWifiConnection(wifi);
+      submitWifiConnection(wifi).catch(() => {});
       return;
     }
 
@@ -261,12 +428,12 @@ export const WifiSelectPage: React.FC = () => {
       return;
     }
 
-    if (selectedWifi.requiresPassword && password.trim().length === 0) {
+    if (selectedWifi.requiresPassword && password.length === 0) {
       Alert.alert('Password required', 'Please enter the Wi-Fi password.');
       return;
     }
 
-    void submitWifiConnection(selectedWifi, password);
+    submitWifiConnection(selectedWifi, password).catch(() => {});
   };
 
   const handleTogglePasswordVisibility = () => {
@@ -275,7 +442,7 @@ export const WifiSelectPage: React.FC = () => {
   };
 
   const handleRefresh = () => {
-    if (isRefreshing || isLoadingWifiList) {
+    if (isRefreshing || isLoadingWifiList || isSubmittingWifi) {
       return;
     }
 
@@ -289,7 +456,7 @@ export const WifiSelectPage: React.FC = () => {
       useNativeDriver: true,
     }).start(() => {
       refreshRotation.setValue(0);
-      void loadNearbyWifiNetworks();
+      prepareDeviceAndLoadWifi().catch(() => {});
     });
   };
 
@@ -317,14 +484,105 @@ export const WifiSelectPage: React.FC = () => {
   };
 
   useEffect(() => {
-    void loadNearbyWifiNetworks();
-  }, []);
+    if (!isDeviceConnected) {
+      return;
+    }
+
+    const unsubscribe = bluetoothActionsRef.current.subscribeToProvisioningStatus(
+      nextStatus => {
+      setProvisioningHint(getProvisioningHintText(nextStatus));
+
+      if (nextStatus.state === 'connecting') {
+        setIsSubmittingWifi(true);
+        return;
+      }
+
+      if (nextStatus.state === 'connected') {
+        const resolvedSsid =
+          nextStatus.ssid ?? pendingWifiSsidRef.current ?? '';
+        clearProvisioningTimeout();
+        pendingWifiSsidRef.current = null;
+        setIsSubmittingWifi(false);
+        setConnectResult({
+          status: 'connected',
+          ssid: resolvedSsid,
+          ip: nextStatus.ip,
+        });
+        setShowPasswordModal(false);
+        setShowSuccessModal(true);
+        setSelectedWifi(null);
+        setPassword('');
+        setWifiError(null);
+        return;
+      }
+
+      if (
+        pendingWifiSsidRef.current &&
+        (nextStatus.state === 'disconnected' || nextStatus.state === 'error')
+      ) {
+        clearProvisioningTimeout();
+        pendingWifiSsidRef.current = null;
+        setIsSubmittingWifi(false);
+        const message = getProvisioningFailureMessage(nextStatus);
+        setWifiError(message);
+        Alert.alert('Wi-Fi connection failed', message);
+      }
+      },
+    );
+
+    bluetoothActionsRef.current.requestWifiStatus().catch(error => {
+      setWifiError(getBluetoothErrorMessage(error));
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [isDeviceConnected]);
+
+  useEffect(() => {
+    const bootstrapKey = targetBleName ?? '__default__';
+    if (bootstrapKeyRef.current === bootstrapKey) {
+      return () => {
+        clearProvisioningTimeout();
+      };
+    }
+
+    bootstrapKeyRef.current = bootstrapKey;
+    prepareDeviceAndLoadWifi().catch(() => {});
+
+    return () => {
+      clearProvisioningTimeout();
+    };
+  }, [prepareDeviceAndLoadWifi, targetBleName]);
+
+  useEffect(() => {
+    if (!isPreparingDevice && bluetoothStatus === BluetoothStatus.Disconnected) {
+      clearProvisioningTimeout();
+      pendingWifiSsidRef.current = null;
+      setIsSubmittingWifi(false);
+      setProvisioningHint(null);
+      setWifiError('Bluetooth disconnected. Please go back and reconnect.');
+    }
+  }, [bluetoothStatus, isPreparingDevice]);
+
+  useEffect(() => {
+    if (
+      !isPreparingDevice &&
+      bluetoothStatus === BluetoothStatus.Error &&
+      bluetoothError?.message
+    ) {
+      clearProvisioningTimeout();
+      pendingWifiSsidRef.current = null;
+      setIsSubmittingWifi(false);
+      setProvisioningHint(null);
+      setWifiError(bluetoothError.message);
+    }
+  }, [bluetoothError?.message, bluetoothStatus, isPreparingDevice]);
 
   useEffect(() => {
     if (!showPasswordModal) {
       overlayOpacity.setValue(0);
       sheetTranslateY.setValue(24);
-      setPasswordKeyboardOffset(0);
       return;
     }
 
@@ -344,27 +602,6 @@ export const WifiSelectPage: React.FC = () => {
       }),
     ]).start();
   }, [overlayOpacity, sheetTranslateY, showPasswordModal]);
-
-  useEffect(() => {
-    const showEvent =
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent =
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-
-    const showSubscription = Keyboard.addListener(showEvent, event => {
-      setPasswordKeyboardOffset(
-        Math.max(0, event.endCoordinates.height - insets.bottom),
-      );
-    });
-    const hideSubscription = Keyboard.addListener(hideEvent, () => {
-      setPasswordKeyboardOffset(0);
-    });
-
-    return () => {
-      showSubscription.remove();
-      hideSubscription.remove();
-    };
-  }, [insets.bottom]);
 
   useEffect(() => {
     if (!showSuccessModal) {
@@ -394,7 +631,14 @@ export const WifiSelectPage: React.FC = () => {
   const successDescription =
     connectResult?.status === 'saved'
       ? `System saved Wi-Fi: ${connectResult?.ssid ?? ''}`
-      : `Connected Wi-Fi: ${connectResult?.ssid ?? ''}`;
+      : connectResult?.ip
+        ? `Watcher connected to ${connectResult?.ssid ?? ''} (${connectResult.ip})`
+        : `Watcher connected to ${connectResult?.ssid ?? ''}`;
+  const cardSubtitle = isPreparingDevice
+    ? `Connecting to ${targetDeviceLabel} over Bluetooth...`
+    : provisioningHint
+      ? provisioningHint
+      : `Select a 2.4GHz Wi-Fi network for ${targetDeviceLabel}`;
   const refreshRotate = refreshRotation.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
@@ -424,26 +668,24 @@ export const WifiSelectPage: React.FC = () => {
               <TouchableOpacity
                 style={[
                   styles.refreshIconWrap,
-                  (isRefreshing || isLoadingWifiList) &&
+                  (isRefreshing || isLoadingWifiList || isPreparingDevice) &&
                     styles.refreshIconWrapActive,
                 ]}
                 activeOpacity={0.75}
                 onPress={handleRefresh}
-                disabled={isRefreshing || isLoadingWifiList}>
+                disabled={isRefreshing || isLoadingWifiList || isPreparingDevice}>
                 <Animated.View
                   style={[
                     styles.refreshIconInner,
                     {transform: [{rotate: refreshRotate}]},
-                    (isRefreshing || isLoadingWifiList) &&
+                    (isRefreshing || isLoadingWifiList || isPreparingDevice) &&
                       styles.refreshIconInnerRefreshing,
                   ]}>
                   <RefreshIcon />
                 </Animated.View>
               </TouchableOpacity>
             </View>
-            <Text style={styles.cardSubtitle}>
-              Only supports 2.4GHz Wi-Fi
-            </Text>
+            <Text style={styles.cardSubtitle}>{cardSubtitle}</Text>
 
             <View style={styles.listWrap}>
               {wifiList.length > 0 ? (
@@ -466,7 +708,9 @@ export const WifiSelectPage: React.FC = () => {
                       ]}
                       activeOpacity={0.85}
                       onPress={() => handleWifiPress(wifi)}
-                      disabled={isSubmittingWifi}>
+                      disabled={
+                        isSubmittingWifi || isPreparingDevice || !isDeviceConnected
+                      }>
                       <View style={styles.wifiRowContent}>
                         <View style={styles.wifiLeft}>
                           <WifiIcon active={wifi.isConnected} />
@@ -480,13 +724,19 @@ export const WifiSelectPage: React.FC = () => {
                   ))}
                 </ScrollView>
               ) : null}
-              {isLoadingWifiList ? (
+              {isPreparingDevice ? (
+                <Text style={styles.emptyStateText}>
+                  Connecting to Watcher over Bluetooth...
+                </Text>
+              ) : null}
+
+              {isLoadingWifiList && !isPreparingDevice ? (
                 <Text style={styles.emptyStateText}>
                   Scanning nearby Wi-Fi...
                 </Text>
               ) : null}
 
-              {!isLoadingWifiList && wifiList.length === 0 ? (
+              {!isPreparingDevice && !isLoadingWifiList && wifiList.length === 0 ? (
                 <Text
                   style={[
                     styles.emptyStateText,
@@ -496,7 +746,7 @@ export const WifiSelectPage: React.FC = () => {
                 </Text>
               ) : null}
 
-              {!isLoadingWifiList && wifiList.length > 0 && wifiError ? (
+              {!isPreparingDevice && !isLoadingWifiList && wifiList.length > 0 && wifiError ? (
                 <Text style={[styles.inlineErrorText, styles.emptyStateError]}>
                   {wifiError}
                 </Text>
@@ -545,7 +795,11 @@ export const WifiSelectPage: React.FC = () => {
         animationType="none"
         statusBarTranslucent
         onRequestClose={() => setShowPasswordModal(false)}>
-        <Animated.View style={[styles.overlay, {opacity: overlayOpacity}]}>
+        <KeyboardAvoidingView
+          style={styles.keyboardAvoidingOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={insets.bottom}>
+          <Animated.View style={[styles.overlay, {opacity: overlayOpacity}]}>
           <TouchableOpacity
             style={styles.overlayTapArea}
             activeOpacity={1}
@@ -556,7 +810,6 @@ export const WifiSelectPage: React.FC = () => {
               styles.bottomSheet,
               {
                 height: sheetHeight,
-                marginBottom: passwordKeyboardOffset,
                 transform: [{translateY: sheetTranslateY}],
               },
             ]}>
@@ -611,7 +864,8 @@ export const WifiSelectPage: React.FC = () => {
               </View>
             </View>
           </Animated.View>
-        </Animated.View>
+          </Animated.View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -744,6 +998,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.overlay,
     justifyContent: 'flex-end',
+  },
+  keyboardAvoidingOverlay: {
+    flex: 1,
   },
   overlayTapArea: {
     flex: 1,

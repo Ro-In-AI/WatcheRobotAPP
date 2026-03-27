@@ -1,5 +1,5 @@
 import { PermissionsAndroid, Platform } from 'react-native';
-import { BleManager, Device, Subscription } from 'react-native-ble-plx';
+import { BleErrorCode, BleManager, Device, Subscription } from 'react-native-ble-plx';
 import base64 from 'react-native-base64';
 import {
     ConnectOptions,
@@ -358,7 +358,18 @@ class BluetoothService {
             options.characteristicUUID,
             (error, characteristic) => {
                 if (error) {
-                    console.error('BLE notification error:', error);
+                    const isExpectedCancellation =
+                        error.errorCode === BleErrorCode.OperationCancelled ||
+                        /cancelled|canceled/i.test(error.message ?? '');
+
+                    if (isExpectedCancellation) {
+                        console.warn('BLE notification cancelled:', {
+                            serviceUUID: options.serviceUUID,
+                            characteristicUUID: options.characteristicUUID,
+                        });
+                    } else {
+                        console.error('BLE notification error:', error);
+                    }
                     return;
                 }
                 if (characteristic?.value) {

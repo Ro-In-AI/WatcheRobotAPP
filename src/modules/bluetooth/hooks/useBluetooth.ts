@@ -40,6 +40,10 @@ const parseWifiProvisioningStatus = (raw: string): WifiProvisioningStatus | null
         return { state: 'cleared', message, raw };
     }
 
+    if (message === 'WIFI_CONFIG_ERROR' || message === 'WIFI_CLEAR_ERROR') {
+        return { state: 'error', message, raw };
+    }
+
     if (message.startsWith('WIFI_CONNECTING')) {
         const [, ssid = ''] = message.split(':');
         return { state: 'connecting', message, raw, ssid };
