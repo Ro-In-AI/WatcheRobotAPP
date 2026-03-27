@@ -1,9 +1,18 @@
 ﻿import React, {useEffect, useRef, useState} from 'react';
-import {Alert, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import {useCallback} from 'react';
+import {
+  ActivityIndicator,
+  Modal,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import {useIsFocused, useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import Svg, {Path} from 'react-native-svg';
+import {BluetoothStatus, useBluetooth} from '../../modules/bluetooth';
 import {
   Camera,
   type Code,
@@ -25,7 +34,12 @@ const COLORS = {
   green: '#8FC31F',
   overlay: 'rgba(0, 0, 0, 0.26)',
   panel: 'rgba(0, 0, 0, 0.46)',
+  modalOverlay: 'rgba(0, 0, 0, 0.58)',
   fallback: '#1C1D21',
+  card: '#FFFFFF',
+  title: '#000000',
+  body: '#636A74',
+  cancelBg: '#F3F5F8',
 };
 
 const ScannerCorners: React.FC = () => (
@@ -57,62 +71,30 @@ const BarcodeHint: React.FC = () => (
 );
 
 const FlashIcon: React.FC = () => (
-  <Svg width={32} height={32} viewBox="0 0 32 32" fill="none">
+  <Svg width={17} height={26} viewBox="0 0 17 26" fill="none">
     <Path
-      d="M8.53418 5.5249H22.9342C23.4092 5.5249 23.7936 5.14053 23.7936 4.66553C23.7936 4.19053 23.4092 3.80615 22.9342 3.80615H8.53418C8.05918 3.80615 7.6748 4.19053 7.6748 4.66553C7.6748 5.14053 8.05918 5.5249 8.53418 5.5249ZM23.8748 7.47803H7.71543V12.2812L11.1998 16.0155V29.4812H20.3936V16.1312L23.8748 12.2718V7.47803ZM18.6717 27.7655H12.9186V16.4218H18.6748V27.7655H18.6717ZM22.1561 11.6124L19.3811 14.6874H12.3092L9.43105 11.603V9.19678H22.1561V11.6124Z"
+      d="M0.859375 1.71875H15.2594C15.7344 1.71875 16.1188 1.33437 16.1188 0.859375C16.1188 0.384375 15.7344 0 15.2594 0H0.859375C0.384375 0 0 0.384375 0 0.859375C0 1.33437 0.384375 1.71875 0.859375 1.71875ZM16.2 3.67187H0.0406246V8.475L3.525 12.2094V25.675H12.7187V12.325L16.2 8.46562V3.67187ZM10.9969 23.9594H5.24375V12.6156H11V23.9594H10.9969ZM14.4812 7.80625L11.7063 10.8812H4.63437L1.75625 7.79687V5.39062H14.4812V7.80625Z"
       fill="#FFFFFF"
     />
   </Svg>
 );
 
-const parseWatcherQrPayload = (rawText: string): WatcherQrPayload | null => {
-  const text = rawText.trim();
-  if (!text) {
-    return null;
-  }
-
-  if (text.startsWith('{')) {
-    try {
-      const parsed = JSON.parse(text) as {
-        type?: unknown;
-        bleName?: unknown;
-        serial?: unknown;
-        model?: unknown;
-      };
-
-      if (parsed.type !== undefined && parsed.type !== 'watcher') {
-        return null;
-      }
-
-      const payload: WatcherQrPayload = {
-        rawQrText: text,
-      };
-
-      if (typeof parsed.bleName === 'string' && parsed.bleName.trim()) {
-        payload.bleName = parsed.bleName.trim();
-      }
-      if (typeof parsed.serial === 'string' && parsed.serial.trim()) {
-        payload.serial = parsed.serial.trim();
-      }
-      if (typeof parsed.model === 'string' && parsed.model.trim()) {
-        payload.model = parsed.model.trim();
-      }
-
-      if (!payload.bleName) {
-        return null;
-      }
-
-      return payload;
-    } catch {
-      return null;
-    }
-  }
-
-  return {
-    bleName: text,
-    rawQrText: text,
-  };
-};
+const FailureIcon: React.FC = () => (
+  <Svg width="100%" height="100%" viewBox="0 0 66 66" fill="none">
+    <Path
+      d="M33 66C51.2254 66 66 51.2254 66 33C66 14.7746 51.2254 0 33 0C14.7746 0 0 14.7746 0 33C0 51.2254 14.7746 66 33 66Z"
+      fill="#CFD3D8"
+    />
+    <Path
+      d="M29.7061 15C29.7061 14.4477 30.1538 14 30.7061 14H33.7061C34.2584 14 34.7061 14.4477 34.7061 15V40.379C34.7061 40.9312 34.2584 41.379 33.7061 41.379H30.7061C30.1538 41.379 29.7061 40.9312 29.7061 40.379V15Z"
+      fill="white"
+    />
+    <Path
+      d="M35.999 48.5C35.999 50.433 34.432 52 32.499 52C30.566 52 28.999 50.433 28.999 48.5C28.999 46.567 30.566 45 32.499 45C34.432 45 35.999 46.567 35.999 48.5Z"
+      fill="white"
+    />
+  </Svg>
+);
 
 // 扫码页用于调用摄像头扫描设备二维码，并继续进入绑定/配网流程。
 export const ScanCodePage: React.FC = () => {
@@ -121,12 +103,15 @@ export const ScanCodePage: React.FC = () => {
   const insets = useSafeAreaInsets();
   const device = useCameraDevice('back');
   const {hasPermission, requestPermission} = useCameraPermission();
+  const {connectToConfiguredDevice, status, clearError, clearAll} =
+    useBluetooth();
   const {scaleValue, verticalScaleValue, windowWidth, windowHeight} =
     useResponsiveScale();
   const [permissionRequested, setPermissionRequested] = useState(false);
-  const [scannedPayload, setScannedPayload] = useState<WatcherQrPayload | null>(
-    null,
-  );
+  const [isPairingActive, setIsPairingActive] = useState(false);
+  const [showFailureModal, setShowFailureModal] = useState(false);
+  const [isTorchEnabled, setIsTorchEnabled] = useState(false);
+  const pairingStartedRef = useRef(false);
   const hasNavigatedRef = useRef(false);
 
   // 页面主要尺寸按统一响应式规则换算
@@ -139,6 +124,11 @@ export const ScanCodePage: React.FC = () => {
   const dividerWidth = Math.min(contentWidth * 0.82, scaleValue(270, 248, 278));
   const actionBottom = Math.max(36, windowHeight * 0.06);
   const actionWidth = Math.min(contentWidth, scaleValue(240, 220, 260));
+  const pairingCardWidth = Math.min(contentWidth, scaleValue(304, 280, 320));
+  const failureCardPadding = scaleValue(30, 24, 30);
+  const failureIconSize = scaleValue(66, 60, 66);
+  const failureButtonGap = scaleValue(20, 16, 20);
+  const failureButtonHeight = verticalScaleValue(50, 46, 50);
 
   useEffect(() => {
     if (!hasPermission && !permissionRequested) {
@@ -147,29 +137,65 @@ export const ScanCodePage: React.FC = () => {
     }
   }, [hasPermission, permissionRequested, requestPermission]);
 
-  const handleScanSuccess = (payload?: WatcherQrPayload) => {
-    if (hasNavigatedRef.current) {
+  const resetPairingState = useCallback(() => {
+    pairingStartedRef.current = false;
+    setIsPairingActive(false);
+    clearError();
+    clearAll();
+  }, [clearAll, clearError]);
+
+  const startPairingFlow = useCallback(() => {
+    if (pairingStartedRef.current) {
       return;
     }
 
-    hasNavigatedRef.current = true;
-    navigation.replace('WifiSelect', payload);
+    pairingStartedRef.current = true;
+    setShowFailureModal(false);
+    setIsPairingActive(true);
+    clearError();
+    clearAll();
+    void connectToConfiguredDevice({
+      scanTimeout: 10000,
+      connectTimeout: 12000,
+      autoConnect: false,
+      enableAutoRescan: false,
+    });
+  }, [clearAll, clearError, connectToConfiguredDevice]);
+
+  useEffect(() => {
+    if (!isPairingActive) {
+      return;
+    }
+
+    if (status === BluetoothStatus.Connected && !hasNavigatedRef.current) {
+      hasNavigatedRef.current = true;
+      navigation.replace('WifiSelect');
+      return;
+    }
+
+    if (status === BluetoothStatus.Error) {
+      pairingStartedRef.current = false;
+      setIsPairingActive(false);
+      setShowFailureModal(true);
+    }
+  }, [isPairingActive, navigation, status]);
+
+  const handleScanSuccess = useCallback(() => {
+    if (hasNavigatedRef.current || isPairingActive) {
+      return;
+    }
+
+    startPairingFlow();
+  }, [isPairingActive, startPairingFlow]);
+
+  const handleRetryPairing = () => {
+    resetPairingState();
+    startPairingFlow();
   };
 
-  const handleCodeDetected = (code: Code) => {
-    const value = typeof code.value === 'string' ? code.value : '';
-    const payload = parseWatcherQrPayload(value);
-
-    if (!payload) {
-      Alert.alert(
-        'Invalid device QR code',
-        'The QR code does not contain a valid Watcher device payload.',
-      );
-      return;
-    }
-
-    setScannedPayload(payload);
-    handleScanSuccess(payload);
+  const handleCloseFailureModal = () => {
+    setShowFailureModal(false);
+    resetPairingState();
   };
 
   const codeScanner = useCodeScanner({
@@ -192,7 +218,8 @@ export const ScanCodePage: React.FC = () => {
           <Camera
             style={StyleSheet.absoluteFill}
             device={device}
-            isActive={isFocused}
+            isActive={isFocused && !isPairingActive && !showFailureModal}
+            torch={isTorchEnabled ? 'on' : 'off'}
             codeScanner={codeScanner}
           />
         ) : (
@@ -232,9 +259,16 @@ export const ScanCodePage: React.FC = () => {
               <ScannerCorners />
             </View>
 
-            <View style={[styles.flashWrap, {marginTop: flashTop}]}>
+            <TouchableOpacity
+              style={[
+                styles.flashWrap,
+                {marginTop: flashTop},
+                isTorchEnabled && styles.flashWrapActive,
+              ]}
+              activeOpacity={0.85}
+              onPress={() => setIsTorchEnabled(previous => !previous)}>
               <FlashIcon />
-            </View>
+            </TouchableOpacity>
 
             {!hasPermission ? (
               <View style={styles.permissionHintWrap}>
@@ -258,15 +292,91 @@ export const ScanCodePage: React.FC = () => {
           activeOpacity={0.85}
           onPress={
             hasPermission
-              ? () => navigation.navigate('WifiSelect', scannedPayload ?? undefined)
+              ? startPairingFlow
               : async () => {
                   await requestPermission();
                 }
-          }>
+          }
+          disabled={isPairingActive}>
           <Text style={styles.actionButtonText}>
-            {hasPermission ? 'Use scanned device' : 'Allow camera'}
+            {hasPermission
+              ? isPairingActive
+                ? 'Bluetooth is connecting...'
+                : 'Use scanned device'
+              : 'Allow camera'}
           </Text>
         </TouchableOpacity>
+
+        {isPairingActive ? (
+          <View style={styles.pairingOverlay}>
+            <View style={[styles.pairingCard, {width: pairingCardWidth}]}>
+              <ActivityIndicator size="small" color={COLORS.green} />
+              <Text style={styles.pairingTitle}>
+                {status === BluetoothStatus.Connecting
+                  ? 'Bluetooth is connecting'
+                  : 'Searching for Watcher'}
+              </Text>
+              <Text style={styles.pairingBody}>
+                {status === BluetoothStatus.Connecting
+                  ? 'Please keep your phone close to the robot while pairing.'
+                  : 'Scanning nearby Bluetooth devices and locating your Watcher.'}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
+        <Modal
+          visible={showFailureModal}
+          transparent
+          animationType="fade"
+          statusBarTranslucent
+          onRequestClose={handleCloseFailureModal}>
+          <View style={styles.failureOverlay}>
+            <View
+              style={[
+                styles.failureCard,
+                {
+                  width: pairingCardWidth,
+                  paddingHorizontal: failureCardPadding,
+                  paddingTop: failureCardPadding,
+                  paddingBottom: failureCardPadding,
+                },
+              ]}>
+              <View
+                style={[
+                  styles.failureIconWrap,
+                  {width: failureIconSize, height: failureIconSize},
+                ]}>
+                <FailureIcon />
+              </View>
+              <Text style={styles.failureTitle}>Connection Failed</Text>
+              <Text style={styles.failureBody}>
+                Please make sure the robot is powered on and nearby, then try
+                again.
+              </Text>
+              <View style={[styles.failureActions, {gap: failureButtonGap}]}>
+                <TouchableOpacity
+                  style={[
+                    styles.failureSecondaryButton,
+                    {height: failureButtonHeight},
+                  ]}
+                  activeOpacity={0.85}
+                  onPress={handleCloseFailureModal}>
+                  <Text style={styles.failureSecondaryText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.failurePrimaryButton,
+                    {height: failureButtonHeight},
+                  ]}
+                  activeOpacity={0.85}
+                  onPress={handleRetryPairing}>
+                  <Text style={styles.failurePrimaryText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     </View>
   );
@@ -314,8 +424,15 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   flashWrap: {
+    alignSelf: 'center',
+    width: 40,
+    height: 40,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  flashWrapActive: {
+    backgroundColor: 'transparent',
   },
   permissionHintWrap: {
     alignSelf: 'center',
@@ -358,5 +475,104 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  pairingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.overlay,
+    paddingHorizontal: 20,
+  },
+  pairingCard: {
+    borderRadius: 20,
+    backgroundColor: COLORS.panel,
+    paddingHorizontal: 22,
+    paddingVertical: 24,
+    alignItems: 'center',
+  },
+  pairingTitle: {
+    marginTop: 14,
+    fontFamily: 'Inter',
+    fontSize: 18,
+    lineHeight: 22,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    textAlign: 'center',
+  },
+  pairingBody: {
+    marginTop: 10,
+    fontFamily: 'Inter',
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '400',
+    color: 'rgba(255,255,255,0.82)',
+    textAlign: 'center',
+  },
+  failureOverlay: {
+    flex: 1,
+    backgroundColor: COLORS.modalOverlay,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  failureCard: {
+    borderRadius: 16,
+    backgroundColor: COLORS.card,
+    alignItems: 'center',
+  },
+  failureIconWrap: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  failureTitle: {
+    fontFamily: 'Inter',
+    fontSize: 18,
+    lineHeight: 18,
+    fontWeight: '500',
+    color: COLORS.title,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  failureBody: {
+    fontFamily: 'Inter',
+    fontSize: 14,
+    lineHeight: 21,
+    fontWeight: '400',
+    color: COLORS.body,
+    textAlign: 'center',
+  },
+  failureActions: {
+    marginTop: 24,
+    width: '100%',
+    flexDirection: 'row',
+  },
+  failureSecondaryButton: {
+    flex: 1,
+    borderRadius: 30,
+    backgroundColor: COLORS.cancelBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  failurePrimaryButton: {
+    flex: 1,
+    borderRadius: 30,
+    backgroundColor: COLORS.green,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  failureSecondaryText: {
+    fontFamily: 'Inter',
+    fontSize: 14,
+    lineHeight: 16,
+    fontWeight: '600',
+    color: COLORS.green,
+  },
+  failurePrimaryText: {
+    fontFamily: 'Inter',
+    fontSize: 14,
+    lineHeight: 16,
+    fontWeight: '600',
+    color: COLORS.white,
   },
 });

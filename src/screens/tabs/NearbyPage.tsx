@@ -2,10 +2,13 @@ import React, {useEffect, useMemo, useState} from 'react';
 import {
   Image,
   Modal,
+  type StyleProp,
   StyleSheet,
   Text,
   TouchableOpacity,
+  type TextStyle,
   View,
+  type ViewStyle,
 } from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import type {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
@@ -15,7 +18,7 @@ import type {
 } from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import Svg, {Circle, Defs, LinearGradient, Path, Stop} from 'react-native-svg';
+import Svg, {Circle, Path} from 'react-native-svg';
 import {useResponsiveScale} from '../../hooks/useResponsiveScale';
 import type {
   RootStackParamList,
@@ -111,14 +114,8 @@ const DiscoveryIllustration: React.FC = () => (
 
 const RequestRobotCard: React.FC = () => (
   <View style={styles.requestRobotWrap}>
-    <Svg style={StyleSheet.absoluteFill} viewBox="0 0 96 96" fill="none">
-      <Defs>
-        <LinearGradient id="request-robot-bg" x1="0" y1="0" x2="96" y2="96">
-          <Stop offset="0" stopColor="#F7F8FB" />
-          <Stop offset="1" stopColor="#EEF1F4" />
-        </LinearGradient>
-      </Defs>
-      <Circle cx="48" cy="48" r="48" fill="url(#request-robot-bg)" />
+    <Svg style={StyleSheet.absoluteFill} viewBox="0 0 137 137" fill="none">
+      <Circle cx="68.5" cy="68.5" r="68" stroke="#8FC31F" />
     </Svg>
     <Image
       source={require('../../assets/images/robot_watcher.png')}
@@ -132,13 +129,16 @@ const ModalActionButton: React.FC<{
   label: string;
   variant: 'primary' | 'secondary';
   onPress: () => void;
-}> = ({label, variant, onPress}) => (
+  style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
+}> = ({label, variant, onPress, style, textStyle}) => (
   <TouchableOpacity
     style={[
       styles.modalActionButton,
       variant === 'primary'
         ? styles.modalActionPrimary
         : styles.modalActionSecondary,
+      style,
     ]}
     activeOpacity={0.85}
     onPress={onPress}>
@@ -148,6 +148,7 @@ const ModalActionButton: React.FC<{
         variant === 'primary'
           ? styles.modalActionPrimaryText
           : styles.modalActionSecondaryText,
+        textStyle,
       ]}>
       {label}
     </Text>
@@ -213,9 +214,10 @@ export const NearbyPage: React.FC = () => {
     windowHeight - tabBarBottom - tabBarHeight - buttonToTabGap - buttonHeight;
 
   const modalWidth = Math.min(
-    windowWidth - scaleValue(60, 40, 68),
-    scaleValue(323, 310, 323),
+    contentWidth - scaleValue(9, 0, 12),
+    scaleValue(324, 300, 332),
   );
+  const modalHorizontalInset = scaleValue(34, 24, 40);
 
   // 当其它页面通过 tab 参数把场景带进来时，这里负责恢复对应弹窗。
   useEffect(() => {
@@ -414,7 +416,11 @@ export const NearbyPage: React.FC = () => {
         statusBarTranslucent
         navigationBarTranslucent
         onRequestClose={() => setActiveModal(null)}>
-        <View style={styles.modalOverlay}>
+        <View
+          style={[
+            styles.modalOverlay,
+            {paddingHorizontal: modalHorizontalInset},
+          ]}>
           <TouchableOpacity
             style={styles.modalBackdrop}
             activeOpacity={1}
@@ -423,7 +429,12 @@ export const NearbyPage: React.FC = () => {
 
           {/* 发现附近设备后的首个弹窗，用户可以选择邀请或直接访问。 */}
           {activeModal === 'discovery' ? (
-            <View style={[styles.modalCard, {width: modalWidth, paddingTop: 18}]}>
+            <View
+              style={[
+                styles.modalCard,
+                styles.discoveryCard,
+                {width: modalWidth},
+              ]}>
               <TouchableOpacity
                 style={styles.discoveryClose}
                 activeOpacity={0.8}
@@ -443,11 +454,15 @@ export const NearbyPage: React.FC = () => {
                 <ModalActionButton
                   label="Invitation"
                   variant="secondary"
+                  style={styles.discoveryActionButton}
+                  textStyle={styles.discoveryActionText}
                   onPress={() => setActiveModal('invitationSent')}
                 />
                 <ModalActionButton
                   label="Visitation"
                   variant="primary"
+                  style={styles.discoveryActionButton}
+                  textStyle={styles.discoveryActionText}
                   onPress={() => setActiveModal('travelConfirmation')}
                 />
               </View>
@@ -609,18 +624,23 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.overlay,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 30,
+    paddingHorizontal: 34,
   },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
   },
   modalCard: {
     position: 'relative',
-    borderRadius: 12,
+    borderRadius: 14,
     backgroundColor: COLORS.white,
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingBottom: 20,
+  },
+  discoveryCard: {
+    paddingTop: 22,
+    paddingBottom: 22,
+    paddingHorizontal: 20,
   },
   discoveryClose: {
     position: 'absolute',
@@ -628,7 +648,7 @@ const styles = StyleSheet.create({
     right: 12,
   },
   discoveryTitle: {
-    marginTop: 18,
+    marginTop: 20,
     fontFamily: 'Inter',
     fontSize: 14,
     lineHeight: 18,
@@ -636,16 +656,16 @@ const styles = StyleSheet.create({
     color: COLORS.black,
   },
   discoveryIllustration: {
-    marginTop: 12,
-    width: 180,
-    height: 92,
+    marginTop: 14,
+    width: 186,
+    height: 100,
     justifyContent: 'center',
     alignItems: 'center',
   },
   discoveryRobot: {
     position: 'absolute',
-    width: 66,
-    height: 66,
+    width: 68,
+    height: 68,
   },
   discoveryRobotLeft: {
     left: 34,
@@ -654,11 +674,11 @@ const styles = StyleSheet.create({
   discoveryRobotRight: {
     right: 28,
     top: 0,
-    width: 56,
-    height: 56,
+    width: 58,
+    height: 58,
   },
   discoveryName: {
-    marginTop: 10,
+    marginTop: 12,
     fontFamily: 'Inter',
     fontSize: 24,
     lineHeight: 26,
@@ -680,13 +700,21 @@ const styles = StyleSheet.create({
     color: COLORS.subText,
   },
   discoveryActions: {
-    marginTop: 18,
+    marginTop: 24,
     width: '100%',
     flexDirection: 'row',
     gap: 12,
   },
+  discoveryActionButton: {
+    height: 42,
+    borderRadius: 21,
+  },
+  discoveryActionText: {
+    fontSize: 12,
+    lineHeight: 14,
+  },
   confirmationCard: {
-    paddingTop: 18,
+    paddingTop: 22,
   },
   requestCard: {
     paddingTop: 18,
@@ -703,24 +731,24 @@ const styles = StyleSheet.create({
     marginTop: 22,
     fontFamily: 'Inter',
     fontSize: 14,
-    lineHeight: 18,
+    lineHeight: 19,
     fontWeight: '400',
     color: COLORS.bodyText,
     textAlign: 'center',
   },
   requestRobotWrap: {
     marginTop: 14,
-    width: 96,
-    height: 96,
+    width: 137,
+    height: 137,
     justifyContent: 'center',
     alignItems: 'center',
   },
   requestRobotImage: {
-    width: 72,
-    height: 72,
+    width: 84,
+    height: 84,
   },
   requestDescription: {
-    marginTop: 12,
+    marginTop: 8,
     fontFamily: 'Inter',
     fontSize: 14,
     lineHeight: 19,

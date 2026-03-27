@@ -23,6 +23,7 @@ import {
 } from '../../modules/bluetooth';
 import {WatcherHeader} from '../../components/WatcherHeader';
 import {useResponsiveScale} from '../../hooks/useResponsiveScale';
+import {WATCHER_ACTION_ITEMS} from './watcherActionItems';
 
 const COLORS = {
   background: '#F2F2F7',
@@ -40,45 +41,6 @@ const FIGMA_BOTTOM_AREA_HEIGHT = 479;
 const BOTTOM_SHEET_HEIGHT = 188;
 const FIGMA_OPEN_CONTROLS_BOTTOM = 203;
 const CLOSED_CONTROLS_BOTTOM = 28;
-const OTHER_ITEMS = [
-  {
-    title: 'Love',
-    image: 'https://www.figma.com/api/mcp/asset/ef5c9065-a36e-454f-8ebb-47a06a66e947',
-  },
-  {
-    title: 'Error',
-    image: 'https://www.figma.com/api/mcp/asset/d2bf57c2-46c9-4742-bf0e-ffbf3bb59ea2',
-  },
-  {
-    title: 'Invoke the tool',
-    image: 'https://www.figma.com/api/mcp/asset/604074ab-8141-420b-a550-4f64c4481ea9',
-  },
-  {
-    title: 'Happy',
-    image: 'https://www.figma.com/api/mcp/asset/048c0a66-ba75-4825-8b34-61a492376c9f',
-  },
-  {
-    title: 'Sleep',
-    image: 'https://www.figma.com/api/mcp/asset/ccee2e44-b8b1-4677-b9c8-2c435869bc32',
-  },
-  {
-    title: 'Thinking',
-    image: 'https://www.figma.com/api/mcp/asset/0bfd63a5-8954-48ca-bbcc-600910e232a9',
-  },
-  {
-    title: 'Think',
-    image: 'https://www.figma.com/api/mcp/asset/cc20d699-ac91-457e-979a-51319d8da816',
-  },
-  {
-    title: 'Speaking',
-    image: 'https://www.figma.com/api/mcp/asset/2432573f-beff-431d-8d04-0135d116203d',
-  },
-  {
-    title: 'listen',
-    image: 'https://www.figma.com/api/mcp/asset/27de6292-8b77-4fc1-ae10-25745036835e',
-  },
-];
-
 const MicrophoneIcon: React.FC = () => (
   <Svg width={22} height={22} viewBox="0 0 200 200" fill="none">
     <Path
@@ -318,6 +280,7 @@ export const SurveillancePage: React.FC = () => {
   const {status, sendCommand} = useBluetooth();
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [isMicMuted, setIsMicMuted] = useState(false);
+  const [selectedOtherId, setSelectedOtherId] = useState<string | null>(null);
   const [bottomAreaHeight, setBottomAreaHeight] = useState(FIGMA_BOTTOM_AREA_HEIGHT);
   const isConnected = status === BluetoothStatus.Connected;
 
@@ -477,10 +440,17 @@ export const SurveillancePage: React.FC = () => {
                 {paddingBottom: insets.bottom + 16},
               ]}
               showsVerticalScrollIndicator={false}>
-              {OTHER_ITEMS.map(item => (
-                <TouchableOpacity key={item.title} style={styles.otherItem} activeOpacity={0.85}>
+              {WATCHER_ACTION_ITEMS.map(item => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[
+                    styles.otherItem,
+                    selectedOtherId === item.id && styles.otherItemActive,
+                  ]}
+                  activeOpacity={0.85}
+                  onPress={() => setSelectedOtherId(item.id)}>
                   <Image
-                    source={{uri: item.image}}
+                    source={item.imageSource}
                     style={[styles.otherImage, {width: otherImageSize, height: otherImageSize}]}
                     resizeMode="contain"
                   />
@@ -617,7 +587,12 @@ const styles = StyleSheet.create({
   otherItem: {
     width: '33.3333%',
     alignItems: 'center',
+    borderRadius: 12,
+    paddingVertical: 8,
     paddingHorizontal: 6,
+  },
+  otherItemActive: {
+    backgroundColor: '#F3F5F8',
   },
   otherImage: {
     marginBottom: 8,
